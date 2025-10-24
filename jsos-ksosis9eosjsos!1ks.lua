@@ -346,7 +346,7 @@ function showRecordingFilePicker(RECORDING_FOLDER, callback)
     end)
 end
 
-local SCRIPT_URL = "https://raw.githubusercontent.com/AREXANS/ndpeei3n3odd0d33id9dd.4nrmreoe9d3nen-dod3-emekekeekeo/refs/heads/main/jsos-ksosis9eosjsos!1ks.lua" -- << WAJIB DIISI!
+local SCRIPT_URL = "https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/Arexanstools.lua" -- << WAJIB DIISI!
 
 -- Mencegah GUI dibuat berulang kali jika skrip dieksekusi lebih dari sekali tanpa me-refresh game.
 if game:GetService("CoreGui"):FindFirstChild("ArexanstoolsGUI") then
@@ -482,34 +482,7 @@ task.spawn(function()
         end)
     end
 
--- [[ BARU: Fungsi untuk menyimpan animasi asli game ]]
-local function storeOriginalAnimations(character)
-    if not character then return end
-    local animateScript = character:FindFirstChild("Animate")
-    if not animateScript then return end
-
-    local function getAnimId(parent, animName)
-        local anim = parent and parent:FindFirstChild(animName)
-        return anim and anim:IsA("Animation") and anim.AnimationId or nil
-    end
-
-    originalGameAnimations = {
-        Idle = {
-            getAnimId(animateScript:FindFirstChild("idle"), "Animation1"),
-            getAnimId(animateScript:FindFirstChild("idle"), "Animation2")
-        },
-        Walk = getAnimId(animateScript:FindFirstChild("walk"), "WalkAnim"),
-        Run = getAnimId(animateScript:FindFirstChild("run"), "RunAnim"),
-        Jump = getAnimId(animateScript:FindFirstChild("jump"), "JumpAnim"),
-        Fall = getAnimId(animateScript:FindFirstChild("fall"), "FallAnim"),
-        Swim = getAnimId(animateScript:FindFirstChild("swim"), "Swim"),
-        SwimIdle = getAnimId(animateScript:FindFirstChild("swimidle"), "SwimIdle"),
-        Climb = getAnimId(animateScript:FindFirstChild("climb"), "ClimbAnim")
-    }
-end
-
--- [[ BARU: Fungsi untuk mengunci animasi ]]
-local function startAnimationLock()
+    local function loadFavorites()
         if not readfile or not isfile or not isfile(EMOTE_FAVORITES_SAVE_FILE) then return end
         local success, result = pcall(function()
             local content = readfile(EMOTE_FAVORITES_SAVE_FILE)
@@ -607,7 +580,6 @@ local function startAnimationLock()
             MaxWalkSpeed = 500,
             TeleportDistance = 100,
             FEInvisibleTransparency = 0.75,
-            PlaybackSpeed = 1, -- [[ BARU ]]
         }
     
         -- Variabel Status
@@ -759,59 +731,14 @@ local function startAnimationLock()
         copyMovementMovers = {}
 
         -- [[ VARIABEL UNTUK FITUR KUNCI KECEPATAN ]] --
-        local isSpeedLockActive = false
-        local lockedSpeed = 16
-        local speedLockConnection = nil
-
-        -- [[ FUNGSI BARU UNTUK KUNCI KECEPATAN ]] --
-        local function stopSpeedLock()
-            if speedLockConnection then
-                speedLockConnection:Disconnect()
-                speedLockConnection = nil
-            end
-            local char = LocalPlayer.Character
-            if char then
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    -- Mengatur ulang ke kecepatan jalan asli saat dinonaktifkan
-                    task.defer(function() humanoid.WalkSpeed = OriginalWalkSpeed end)
-                end
-            end
-        end
-
-        local function startSpeedLock()
-            stopSpeedLock() -- Hentikan loop yang ada sebelum memulai yang baru
-            
-            speedLockConnection = RunService.Heartbeat:Connect(function()
-                local char = LocalPlayer.Character
-                if not (isSpeedLockActive and char) then
-                    stopSpeedLock()
-                    return
-                end
-                
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                
-                if hrp and humanoid and humanoid.Health > 0 then
-                    -- Logika utama kunci kecepatan
-                    local currentVelocity = hrp.AssemblyLinearVelocity
-                    local moveDirection = humanoid.MoveDirection
-                    
-                    if moveDirection.Magnitude > 0.1 then
-                        -- Terapkan kecepatan terkunci ke arah gerakan saat ini
-                        local newVelocity = Vector3.new(moveDirection.X, 0, moveDirection.Z).Unit * lockedSpeed
-                        hrp.AssemblyLinearVelocity = Vector3.new(newVelocity.X, currentVelocity.Y, newVelocity.Z)
-                    else
-                        -- Kurangi kecepatan secara bertahap saat berhenti untuk gerakan yang lebih halus
-                        local dampingFactor = 0.85
-                        hrp.AssemblyLinearVelocity = Vector3.new(currentVelocity.X * dampingFactor, currentVelocity.Y, currentVelocity.Z * dampingFactor)
-                    end
-                    
-                    -- Atur WalkSpeed ke nilai yang sama untuk konsistensi
-                    humanoid.WalkSpeed = lockedSpeed
-                end
-            end)
-        end
+        local speedLock_currentSpeed = 16
+        local speedLock_humanoid = nil
+        local speedLock_isEnforced = false
+        local speedLock_isPaused = false
+        local speedLock_connections = {}
+        local speedLock_lastTick = 0
+        local speedLock_tickInterval = 0.12
+        local speedLock_serverBaseline = nil
     
         -- ====================================================================
         -- == VARIABEL UNTUK FITUR EMOTE DAN ANIMASI (DIPISAHKAN)          ==
@@ -821,9 +748,6 @@ local function startAnimationLock()
         isAnimationEnabled = false 
         AnimationScreenGui = nil
         local isGameAnimationOverrideActive = false -- [BARU] Lacak jika game menimpa animasi
-        local isAnimationLockEnabled = false -- [[ BARU ]] Untuk fitur kunci animasi
-        local animationLockConnection = nil -- [[ BARU ]] Koneksi untuk loop kunci animasi
-        local originalGameAnimations = {} -- [[ BARU ]] Untuk menyimpan animasi bawaan game
     
         -- Variabel Global untuk menyimpan animasi
         lastAnimations = {}
@@ -1022,61 +946,6 @@ local function startAnimationLock()
     ExpirationLabel.TextSize = 10
     ExpirationLabel.Font = Enum.Font.SourceSans
     ExpirationLabel.Parent = MainFrame
-    
-    local countdownConn
-    local logoutNotificationFrame = nil
-    countdownConn = RunService.Heartbeat:Connect(function()
-        if not ScreenGui or not ScreenGui.Parent then
-            countdownConn:Disconnect()
-            return
-        end
-
-        local remainingSeconds = expirationTimestamp - os.time()
-
-        if remainingSeconds <= 10 and remainingSeconds > 0 then
-            if not logoutNotificationFrame or not logoutNotificationFrame.Parent then
-                logoutNotificationFrame = Instance.new("Frame", ScreenGui)
-                logoutNotificationFrame.Name = "LogoutNotificationFrame"
-                logoutNotificationFrame.Size = UDim2.new(0, 300, 0, 50)
-                logoutNotificationFrame.Position = UDim2.new(0.5, -150, 0.1, 0)
-                logoutNotificationFrame.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                logoutNotificationFrame.BackgroundTransparency = 0.2
-                logoutNotificationFrame.BorderSizePixel = 0
-                local corner = Instance.new("UICorner", logoutNotificationFrame); corner.CornerRadius = UDim.new(0, 8)
-                local stroke = Instance.new("UIStroke", logoutNotificationFrame); stroke.Color = Color3.fromRGB(255, 100, 100); stroke.Thickness = 1
-                
-                local label = Instance.new("TextLabel", logoutNotificationFrame)
-                label.Name = "CountdownLabel"
-                label.Size = UDim2.new(1, 0, 1, 0)
-                label.BackgroundTransparency = 1
-                label.Font = Enum.Font.SourceSansBold
-                label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                label.TextSize = 16
-                label.TextWrapped = true
-            end
-            local label = logoutNotificationFrame and logoutNotificationFrame:FindFirstChild("CountdownLabel")
-            if label then
-                label.Text = "Sesi akan berakhir & logout dalam " .. math.floor(remainingSeconds) .. " detik..."
-            end
-        end
-
-        if remainingSeconds < 1 then
-            countdownConn:Disconnect() -- Disconnect this timer itself
-            HandleLogout() -- Perform total shutdown and logout
-            return -- Stop the function
-        end
-
-        -- Update label text
-        local days = math.floor(remainingSeconds / 86400)
-        local rem = remainingSeconds % 86400
-        local hours = math.floor(rem / 3600)
-        rem = rem % 3600
-        local minutes = math.floor(rem / 60)
-        local seconds = rem % 60
-        if ExpirationLabel and ExpirationLabel.Parent then
-            ExpirationLabel.Text = string.format("Expires in: %dD %02dH %02dM %02dS", days, hours, minutes, seconds)
-        end
-    end)
     
     local TabsFrame = Instance.new("ScrollingFrame")
     TabsFrame.Name = "TabsFrame"
@@ -1472,11 +1341,9 @@ local function startAnimationLock()
             AnimationTransparent = isAnimationTransparent,
             WalkSpeedValue = Settings.WalkSpeed,
             FlySpeedValue = Settings.FlySpeed,
-            PlaybackSpeedValue = Settings.PlaybackSpeed, -- [[ BARU ]]
             FEInvisibleTransparencyValue = Settings.FEInvisibleTransparency,
-            AnimationLock = isAnimationLockEnabled, -- [[ BARU ]]
-            SpeedLock = isSpeedLockActive,
-            SpeedLockValue = lockedSpeed
+            SpeedLockEnabled = speedLock_isEnforced,
+            SpeedLockValue = speedLock_currentSpeed
         }
         
         pcall(function()
@@ -1513,11 +1380,9 @@ local function startAnimationLock()
                 
                 Settings.WalkSpeed = decodedData.WalkSpeedValue or 16
                 Settings.FlySpeed = decodedData.FlySpeedValue or 1
-                Settings.PlaybackSpeed = decodedData.PlaybackSpeedValue or 1 -- [[ BARU ]]
                 Settings.FEInvisibleTransparency = decodedData.FEInvisibleTransparencyValue or 0.75
-                isAnimationLockEnabled = decodedData.AnimationLock or false -- [[ BARU ]]
-                isSpeedLockActive = decodedData.SpeedLock or false
-                lockedSpeed = decodedData.SpeedLockValue or 16
+                speedLock_isEnforced = decodedData.SpeedLockEnabled or false
+                speedLock_currentSpeed = decodedData.SpeedLockValue or 16
             end
         end)
         if not success then
@@ -2430,8 +2295,29 @@ local function startAnimationLock()
                 end
                 -- [PERBAIKAN SELESAI]
                 
-                local removeAnimButton = createTheButton("Hapus Animasi", restoreOriginalGameAnimations)
-                removeAnimButton.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
+                local function resetToRthroPack()
+                    local anims = Animations
+                    if anims.Idle["Rthro"] then setAnimation("Idle", anims.Idle["Rthro"]) end
+                    if anims.Walk["Rthro"] then setAnimation("Walk", anims.Walk["Rthro"]) end
+                    if anims.Run["Rthro"] then setAnimation("Run", anims.Run["Rthro"]) end
+                    if anims.Jump["Rthro"] then setAnimation("Jump", anims.Jump["Rthro"]) end
+                    if anims.Fall["Rthro"] then setAnimation("Fall", anims.Fall["Rthro"]) end
+                    if anims.SwimIdle["Rthro"] then setAnimation("SwimIdle", anims.SwimIdle["Rthro"]) end
+                    if anims.Swim["Rthro"] then setAnimation("Swim", anims.Swim["Rthro"]) end
+                    if anims.Climb["Rthro"] then setAnimation("Climb", anims.Climb["Rthro"]) end
+
+                    for animType, button in pairs(activeAnimationButtons) do
+                        if button and button.Parent then
+                            button.BackgroundColor3 = defaultButtonColor
+                        end
+                    end
+                    activeAnimationButtons = {}
+                    
+                    showNotification("Semua animasi direset ke Rthro Pack", Color3.fromRGB(50, 150, 255))
+                end
+
+                local resetButton = createTheButton("Reset Semua Animasi Rthro", resetToRthroPack)
+                resetButton.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
 
                 local function resetToAdidasSport()
                     local anims = Animations
@@ -2633,93 +2519,115 @@ local function startAnimationLock()
     -- == BAGIAN FUNGSI UTAMA (PLAYER, COMBAT, DLL)                      ==
     -- ====================================================================
 
-
--- [[ BARU: Fungsi untuk mengembalikan animasi ke bawaan game ]]
-local function restoreOriginalGameAnimations()
-    if not next(originalGameAnimations) then
-        showNotification("Animasi asli game tidak tersimpan.", Color3.fromRGB(200, 150, 50))
-        return
+    -- [[ FUNGSI UNTUK FITUR KUNCI KECEPATAN ]] --
+    local speedLock_disconnectAll, speedLock_bindHumanoid
+    
+    local function speedLock_canonicalDefault()
+        local ok, val = pcall(function() return game:GetService("StarterPlayer").CharacterWalkSpeed end)
+        if ok and typeof(val) == "number" and val > 0 then return val end
+        return 16
     end
 
-    local char = LocalPlayer.Character
-    if not char then return end
+    local function speedLock_setWalkSpeed(humanoid, speed)
+        if humanoid and humanoid.Parent then
+            pcall(function() humanoid.WalkSpeed = speed end)
+        end
+    end
 
-    -- Matikan kunci animasi jika aktif
-    if isAnimationLockEnabled then
-        stopAnimationLock()
+    local function speedLock_canEnforce()
+        local h = speedLock_humanoid
+        if not speedLock_isEnforced then return false end
+        if not h or not h.Parent then return false end
+        if speedLock_isPaused then return false end
+        if h.Health <= 0 then return false end
+        if h.PlatformStand or h.Sit then return false end
+        local st = h:GetState()
+        if st == Enum.HumanoidStateType.Ragdoll or st == Enum.HumanoidStateType.FallingDown or st == Enum.HumanoidStateType.Physics or st == Enum.HumanoidStateType.GettingUp or st == Enum.HumanoidStateType.Seated then return false end
+        local hrp = h.Parent:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp.Anchored then return false end
+        return true
+    end
+
+    local function speedLock_heartbeat()
+        if not speedLock_humanoid then return end
+        local t = tick()
+        if t - speedLock_lastTick < speedLock_tickInterval then return end
+        speedLock_lastTick = t
+        if not speedLock_canEnforce() then return end
+        if speedLock_humanoid.WalkSpeed ~= speedLock_currentSpeed then
+            speedLock_setWalkSpeed(speedLock_humanoid, speedLock_currentSpeed)
+        end
+    end
+
+    speedLock_disconnectAll = function()
+        for _, conn in ipairs(speedLock_connections) do
+            if conn then conn:Disconnect() end
+        end
+        speedLock_connections = {}
     end
     
-    -- Hapus animasi kustom yang tersimpan
-    lastAnimations = {}
-    if writefile then
-        pcall(function() 
-            writefile(ANIMATION_SAVE_FILE, HttpService:JSONEncode({})) 
+    local function speedLock_captureServerBaseline()
+        task.spawn(function()
+            local h = speedLock_humanoid
+            if not h or not h.Parent then return end
+            local start = tick()
+            local last = h.WalkSpeed
+            while tick() - start < 0.6 do
+                last = h.WalkSpeed
+                task.wait(0.1)
+            end
+            if typeof(last) == "number" and last > 0 then
+                speedLock_serverBaseline = last
+            end
         end)
     end
-    
-    -- Terapkan kembali animasi asli
-    local function applyOriginal(animType, animIds)
-        if not animIds then return end
-        if animType == "Idle" then
-            if animIds[1] then setAnimation("Idle", animIds) end
-        else
-            if animIds then setAnimation(animType, animIds) end
-        end
+
+    local function speedLock_applyDisabledState()
+        local h = speedLock_humanoid
+        if not h or not h.Parent then return end
+        local target = speedLock_serverBaseline or speedLock_canonicalDefault()
+        speedLock_setWalkSpeed(h, target)
+        speedLock_captureServerBaseline()
     end
 
-    applyOriginal("Idle", originalGameAnimations.Idle)
-    applyOriginal("Walk", originalGameAnimations.Walk)
-    applyOriginal("Run", originalGameAnimations.Run)
-    applyOriginal("Jump", originalGameAnimations.Jump)
-    applyOriginal("Fall", originalGameAnimations.Fall)
-    applyOriginal("Swim", originalGameAnimations.Swim)
-    applyOriginal("SwimIdle", originalGameAnimations.SwimIdle)
-    applyOriginal("Climb", originalGameAnimations.Climb)
-    
-    showNotification("Animasi telah dikembalikan ke bawaan game.", Color3.fromRGB(50, 150, 255))
-    
-    -- Perbarui UI untuk menghapus highlight hijau
-    if AnimationScreenGui then
-        initializeAnimationGUI()
-    end
-end
+    speedLock_bindHumanoid = function(humanoid)
+        if not humanoid then return end
+        speedLock_humanoid = humanoid
+        speedLock_disconnectAll()
 
--- [[ BARU: Fungsi untuk mengunci animasi ]]
-local function startAnimationLock()
-    if animationLockConnection then
-        animationLockConnection:Disconnect()
-    end
-    
-    isAnimationLockEnabled = true
-    showNotification("Kunci Animasi Diaktifkan!", Color3.fromRGB(50, 200, 50))
-
-    animationLockConnection = RunService.Heartbeat:Connect(function()
-        if not isAnimationLockEnabled then
-            if animationLockConnection then
-                animationLockConnection:Disconnect()
-                animationLockConnection = nil
+        table.insert(speedLock_connections, humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if speedLock_isEnforced and speedLock_canEnforce() and humanoid.WalkSpeed ~= speedLock_currentSpeed then
+                speedLock_setWalkSpeed(humanoid, speedLock_currentSpeed)
             end
-            return
-        end
+        end))
+
+        table.insert(speedLock_connections, humanoid.StateChanged:Connect(function(_, new)
+            if new == Enum.HumanoidStateType.Ragdoll or new == Enum.HumanoidStateType.FallingDown or new == Enum.HumanoidStateType.Physics or new == Enum.HumanoidStateType.GettingUp or new == Enum.HumanoidStateType.Seated then
+                speedLock_isPaused = true
+                task.delay(1.0, function() speedLock_isPaused = false end)
+            end
+        end))
         
-        local char = LocalPlayer.Character
-        if char and next(lastAnimations) then
-            applyAllAnimations(char)
+        table.insert(speedLock_connections, humanoid:GetPropertyChangedSignal("PlatformStand"):Connect(function() 
+            speedLock_isPaused = humanoid.PlatformStand 
+        end))
+
+        table.insert(speedLock_connections, humanoid.AncestryChanged:Connect(function(_, parent)
+            if not parent then speedLock_disconnectAll() end
+        end))
+
+        if speedLock_isEnforced then
+            if not table.find(speedLock_connections, "heartbeat") then
+                speedLock_lastTick = 0
+                local conn = RunService.Heartbeat:Connect(speedLock_heartbeat)
+                table.insert(speedLock_connections, conn)
+            end
+            if speedLock_canEnforce() then speedLock_setWalkSpeed(humanoid, speedLock_currentSpeed) end
+        else
+            speedLock_applyDisabledState()
         end
-    end)
-end
-
-local function stopAnimationLock()
-    if animationLockConnection then
-        animationLockConnection:Disconnect()
-        animationLockConnection = nil
     end
-    isAnimationLockEnabled = false
-    showNotification("Kunci Animasi Dinonaktifkan.", Color3.fromRGB(200, 150, 50))
-end
--- [[ AKHIR FUNGSI KUNCI ANIMASI ]]
-
--- [[ AKHIR FUNGSI KUNCI KECEPATAN ]]
+    -- [[ AKHIR FUNGSI KUNCI KECEPATAN ]]
 
     local stopSpectate; -- Deklarasi awal
     local cycleSpectate;
@@ -4969,59 +4877,6 @@ end
         UserInputService.InputChanged:Connect(function(input) if isDraggingSlider then updateSlider(input) end end)
         return sliderFrame
     end
-
-    -- [[ FUNGSI UI BARU: KOTAK INPUT UNTUK PENGATURAN KECEPATAN ]]
-    local function createSpeedInput(parent, name, defaultValue, callback)
-        local frame = Instance.new("Frame", parent)
-        frame.Size = UDim2.new(1, 0, 0, 25)
-        frame.BackgroundTransparency = 1
-        
-        local layout = Instance.new("UIListLayout", frame)
-        layout.FillDirection = Enum.FillDirection.Horizontal
-        layout.VerticalAlignment = Enum.VerticalAlignment.Center
-        layout.Padding = UDim.new(0, 10)
-
-        local label = Instance.new("TextLabel", frame)
-        label.Name = "SpeedLabel"
-        label.Size = UDim2.new(0.6, -10, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.SourceSans
-        label.Text = name .. ":"
-        label.TextColor3 = Color3.fromRGB(200, 200, 200)
-        label.TextSize = 12
-        label.TextXAlignment = Enum.TextXAlignment.Left
-
-        local textBox = Instance.new("TextBox", frame)
-        textBox.Name = "SpeedTextBox"
-        textBox.Size = UDim2.new(0.4, 0, 1, 0)
-        textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        textBox.Font = Enum.Font.SourceSans
-        textBox.Text = tostring(defaultValue)
-        textBox.PlaceholderText = tostring(defaultValue)
-        textBox.TextColor3 = Color3.fromRGB(220, 220, 220)
-        textBox.TextSize = 12
-        textBox.ClearTextOnFocus = false
-        local boxCorner = Instance.new("UICorner", textBox)
-        boxCorner.CornerRadius = UDim.new(0, 4)
-
-        textBox:GetPropertyChangedSignal("Text"):Connect(function()
-            -- Hanya izinkan angka dan satu titik desimal
-            textBox.Text = textBox.Text:gsub("[^%d%.]", ""):gsub("(%.[^%.]*)%.", "%1")
-        end)
-
-        textBox.FocusLost:Connect(function(enterPressed)
-            local value = tonumber(textBox.Text)
-            if value then
-                callback(value)
-                saveFeatureStates() -- Simpan otomatis saat nilai diubah
-            else
-                -- Jika input tidak valid, kembalikan ke nilai default
-                textBox.Text = tostring(defaultValue)
-            end
-        end)
-
-        return frame
-    end
     
     local function createToggle(parent, name, initialState, callback)
         local toggleFrame = Instance.new("Frame", parent); toggleFrame.Size = UDim2.new(1, 0, 0, 25); toggleFrame.BackgroundTransparency = 1; local toggleLabel = Instance.new("TextLabel", toggleFrame); toggleLabel.Size = UDim2.new(0.8, -10, 1, 0); toggleLabel.Position = UDim2.new(0, 5, 0, 0); toggleLabel.BackgroundTransparency = 1; toggleLabel.Text = name; toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); toggleLabel.TextSize = 12; toggleLabel.TextXAlignment = Enum.TextXAlignment.Left; toggleLabel.Font = Enum.Font.SourceSans
@@ -5227,36 +5082,43 @@ end
     local function setupGeneralTab()
         createToggle(GeneralTabContent, "ESP Nama", IsEspNameEnabled, ToggleESPName)
         createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
-        -- Menggunakan createSpeedInput untuk Kecepatan Jalan
-        createSpeedInput(GeneralTabContent, "Kecepatan Jalan", Settings.WalkSpeed, function(v)
-            Settings.WalkSpeed = v
-            if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then
-                LocalPlayer.Character.Humanoid.WalkSpeed = v
-            end
-        end)
+        createSlider(GeneralTabContent, "Kecepatan Jalan", 0, Settings.MaxWalkSpeed, Settings.WalkSpeed, "", 1, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
         createToggle(GeneralTabContent, "Jalan Cepat", IsWalkSpeedEnabled, function(v) IsWalkSpeedEnabled = v; ToggleWalkSpeed(v) end)
         
-        -- Menggunakan createSpeedInput untuk Kunci Kecepatan
-        createSpeedInput(GeneralTabContent, "Kunci Kecepatan", lockedSpeed, function(v)
-            lockedSpeed = v
-            if isSpeedLockActive then
-                startSpeedLock() -- Mulai ulang loop dengan kecepatan baru
+        -- [[ INTEGRASI KUNCI KECEPATAN UI ]] --
+        createSlider(GeneralTabContent, "Kecepatan Terkunci", 0, 200, speedLock_currentSpeed, "", 1, function(v) 
+            speedLock_currentSpeed = v
+            if speedLock_isEnforced and speedLock_canEnforce() then
+                speedLock_setWalkSpeed(speedLock_humanoid, speedLock_currentSpeed)
             end
         end)
-        createToggle(GeneralTabContent, "Kunci Kecepatan", isSpeedLockActive, function(v)
-            isSpeedLockActive = v
-            if isSpeedLockActive then
-                startSpeedLock()
+        createToggle(GeneralTabContent, "Kunci Kecepatan", speedLock_isEnforced, function(state)
+            speedLock_isEnforced = state
+            local h = speedLock_humanoid
+            if not h or not h.Parent then return end
+            
+            if state then
+                if not next(speedLock_connections) then -- Re-bind if connections were lost
+                    speedLock_bindHumanoid(h)
+                end
+                if not table.find(speedLock_connections, "heartbeat") then
+                    speedLock_lastTick = 0
+                    local conn = RunService.Heartbeat:Connect(speedLock_heartbeat)
+                    table.insert(speedLock_connections, conn)
+                end
+                if speedLock_canEnforce() then speedLock_setWalkSpeed(h, speedLock_currentSpeed) end
+                showNotification("Kunci Kecepatan diaktifkan", Color3.fromRGB(50, 200, 50))
             else
-                stopSpeedLock()
+                speedLock_disconnectAll()
+                speedLock_applyDisabledState()
+                -- Re-bind essential listeners after disconnecting all
+                task.wait(0.1)
+                speedLock_bindHumanoid(h)
+                showNotification("Kunci Kecepatan dinonaktifkan", Color3.fromRGB(200, 150, 50))
             end
-            saveFeatureStates()
         end)
         
-        -- Menggunakan createSpeedInput untuk Kecepatan Terbang
-        createSpeedInput(GeneralTabContent, "Kecepatan Terbang", Settings.FlySpeed, function(v)
-            Settings.FlySpeed = v
-        end)
+        createSlider(GeneralTabContent, "Kecepatan Terbang", 0, Settings.MaxFlySpeed, Settings.FlySpeed, "", 0.1, function(v) Settings.FlySpeed = v end)
         createToggle(GeneralTabContent, "Terbang", IsFlying, function(v) if v then if UserInputService.TouchEnabled then StartMobileFly() else StartFly() end else if UserInputService.TouchEnabled then StopMobileFly() else StopFly() end end end)
         createToggle(GeneralTabContent, "Noclip", IsNoclipEnabled, function(v) ToggleNoclip(v) end)
         createToggle(GeneralTabContent, "Infinity Jump", IsInfinityJumpEnabled, function(v) IsInfinityJumpEnabled = v; saveFeatureStates(); if v then if LocalPlayer.Character and LocalPlayer.Character.Humanoid then infinityJumpConnection = ConnectEvent(UserInputService.JumpRequest, function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end elseif infinityJumpConnection then infinityJumpConnection:Disconnect(); infinityJumpConnection = nil end end)
@@ -5315,16 +5177,6 @@ end
             if isAnimationEnabled and applyAnimationTransparency then applyAnimationTransparency(v) end
             saveFeatureStates()
         end).LayoutOrder = 4
-
-        -- [[ BARU: Tombol untuk kunci animasi ]]
-        createToggle(VipTabContent, "Kunci Animasi", isAnimationLockEnabled, function(v)
-            if v then
-                startAnimationLock()
-            else
-                stopAnimationLock()
-            end
-            saveFeatureStates()
-        end).LayoutOrder = 5
     end
 
     setupSettingsTab = function()
@@ -6244,10 +6096,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local humanoid = char and char:FindFirstChildOfClass("Humanoid")
             if not (hrp and humanoid) then if onComplete then onComplete() end; return end
         
-            pcall(function()
-                hrp:SetNetworkOwner(LocalPlayer)
-            end)
-        
             originalPlaybackWalkSpeed = humanoid.WalkSpeed
             IsPlaybackActive = true
             local animateScript = char and char:FindFirstChild("Animate")
@@ -6266,7 +6114,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             playbackMovers = {}
         
             pcall(function()
-                local responsivenessValue = 50 -- 🔥 PERUBAHAN: Mengurangi nilai untuk gerakan lebih halus
+                local responsivenessValue = isAnimationBypassEnabled and 35 or 200
                 local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
                 local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = responsivenessValue; alignPos.MaxForce = 100000
                 local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 100000
@@ -6300,12 +6148,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local lastFrameIndex = 1
             local wasPaused = false
             
-            -- 🔥 BARU: Parameter untuk Raycast
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            raycastParams.FilterDescendantsInstances = {char}
-            raycastParams.IgnoreWater = true
-
             playbackConnection = RunService.RenderStepped:Connect(function(dt)
                 if not isPlaying then
                     if playbackConnection then playbackConnection:Disconnect(); playbackConnection = nil end
@@ -6329,7 +6171,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                     
                     -- Buat ulang mover karena telah dihancurkan saat jeda
                     pcall(function()
-                        local responsivenessValue = 50 -- 🔥 PERUBAHAN: Mengurangi nilai untuk gerakan lebih halus
+                        local responsivenessValue = isAnimationBypassEnabled and 35 or 200
                         local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
                         local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = responsivenessValue; alignPos.MaxForce = 100000
                         local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 100000
@@ -6337,9 +6179,16 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                         playbackMovers.alignPos = alignPos
                         playbackMovers.alignOrient = alignOrient
                     end)
+                    -- [[ PERBAIKAN BUG STUCK ANIMASI ]]
+                    -- Paksa Animate script untuk re-evaluasi state setelah jeda
+                    pcall(function()
+                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                        task.wait()
+                        humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                    end)
                 end
         
-                local elapsedTime = (tick() - loopStartTime) * Settings.PlaybackSpeed
+                local elapsedTime = tick() - loopStartTime
                 
                 if elapsedTime >= recordingDuration then
                     if playbackConnection then playbackConnection:Disconnect(); playbackConnection = nil end
@@ -6383,20 +6232,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
 
 
                 local currentState = currentFrame.state
-
-                -- 🔥 BARU: Logika Raycast untuk mencegah melayang
-                if isAnimationBypassEnabled and currentState ~= "Enum.HumanoidStateType.Jumping" and currentState ~= "Enum.HumanoidStateType.Freefall" then
-                    local rayOrigin = interpolatedCFrame.Position + Vector3.new(0, 2, 0)
-                    local rayDirection = Vector3.new(0, -10, 0)
-                    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                    
-                    if raycastResult and raycastResult.Instance then
-                        local groundPosition = raycastResult.Position
-                        local hipHeight = humanoid.HipHeight
-                        -- Ganti posisi Y dari CFrame dengan posisi tanah + tinggi pinggul
-                        interpolatedCFrame = CFrame.new(interpolatedCFrame.Position.X, groundPosition.Y + hipHeight, interpolatedCFrame.Position.Z) * (interpolatedCFrame - interpolatedCFrame.Position)
-                    end
-                end
                 
                 if not isAnimationBypassEnabled then
                     if playbackMovers.alignPos then
@@ -6418,9 +6253,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                     for _, animData in ipairs(currentFrame.anims) do
                         requiredAnims[animData.id] = animData.time
                         if not animationCache[animData.id] then
-                            local anim = Instance.new("Animation")
-                            anim.Name = "ArexansPlaybackTrack"
-                            anim.AnimationId = animData.id
+                            local anim = Instance.new("Animation"); anim.AnimationId = animData.id
                             animationCache[animData.id] = humanoid:LoadAnimation(anim)
                         end
                         local track = animationCache[animData.id]
@@ -6443,38 +6276,18 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                     -- Set WalkSpeed dynamically to let the default Animate script handle walk/run transitions
                     humanoid.WalkSpeed = velocity
 
-                    -- [[ PERBAIKAN LOMPATAN v2 & Gerakan Karakter ]]
-                    if currentState == "Enum.HumanoidStateType.Jumping" then
-                        -- Panggil ChangeState untuk memicu animasi dan impuls lompatan
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                        -- Nonaktifkan align position sementara agar fisika lompatan tidak dilawan
-                        if playbackMovers.alignPos then
-                            playbackMovers.alignPos.Enabled = false
-                        end
-                        -- Tetap aktifkan align orientation dan periksa shift lock
-                        if playbackMovers.alignOrient then
-                            if IsShiftLockEnabled then
-                                playbackMovers.alignOrient.Enabled = false
-                            else
-                                playbackMovers.alignOrient.Enabled = true
-                                playbackMovers.alignOrient.CFrame = interpolatedCFrame
-                            end
-                        end
-                    else
-                        -- Untuk semua state lain, aktifkan kembali align position dan perbarui
-                        if playbackMovers.alignPos then
-                            playbackMovers.alignPos.Enabled = true
-                            playbackMovers.alignPos.Position = interpolatedCFrame.Position
-                        end
-                        if playbackMovers.alignOrient then
-                            if IsShiftLockEnabled then
-                                playbackMovers.alignOrient.Enabled = false
-                            else
-                                playbackMovers.alignOrient.Enabled = true
-                                playbackMovers.alignOrient.CFrame = interpolatedCFrame
-                            end
+                    -- Gerakkan karakter menggunakan AlignPosition dan AlignOrientation untuk FE
+                    if playbackMovers.alignPos and playbackMovers.alignOrient then
+                        playbackMovers.alignPos.Position = interpolatedCFrame.Position
+                        -- Shiftlock Fix v4: Explicitly check for the script's own shift lock feature
+                        if IsShiftLockEnabled then
+                            playbackMovers.alignOrient.Enabled = false
+                        else
+                            playbackMovers.alignOrient.Enabled = true
+                            playbackMovers.alignOrient.CFrame = interpolatedCFrame
                         end
                     end
+                    
                 end
         
                 pcall(function()
@@ -6541,12 +6354,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         end)
         bypassAnimToggle.LayoutOrder = 3
 
-        -- [[ BARU: Kontrol Kecepatan Playback ]]
-        local playbackSpeedInput = createSpeedInput(controlsContainer, "Kecepatan Playback", Settings.PlaybackSpeed, function(v)
-            Settings.PlaybackSpeed = v
-        end)
-        playbackSpeedInput.LayoutOrder = 4
-
         recStatusLabel = Instance.new("TextLabel", controlsContainer) -- [[ PERBAIKAN: Parent diubah ]]
         recStatusLabel.Name = "StatusLabel"
         recStatusLabel.Size = UDim2.new(1, 0, 0, 20)
@@ -6581,20 +6388,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                         -- Ini memerlukan sedikit trik karena elapsedTime bersifat lokal untuk koneksi
                         -- Kita akan menyimpannya di variabel upvalue saat jeda
                     end
-                    
-                    pcall(function()
-                        local char = LocalPlayer.Character
-                        if not char then return end
-                        local humanoid = char:FindFirstChildOfClass("Humanoid")
-                        if not humanoid then return end
-
-                        for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                            if track.Animation.Name == "ArexansPlaybackTrack" then
-                                track:Stop(0.1)
-                            end
-                        end
-                    end)
-
                     cleanupSinglePlayback(true) -- Gunakan 'true' untuk menandakan ini bagian dari sekuens
                     playButton.Text = "▶️"
                     playButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
@@ -6611,7 +6404,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         end)
 
         stopButton.MouseButton1Click:Connect(function()
-            stopPlayback()
+            stopActions()
         end)
 
         deleteSelectedButton.MouseButton1Click:Connect(function()
@@ -6801,10 +6594,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         if not character then return end
     
         -- Tunggu sebentar agar karakter sepenuhnya dimuat
-        task.wait(0.2)
-
-        -- Simpan animasi asli game sebelum ditimpa
-        storeOriginalAnimations(character)
+        task.wait(0.2) 
     
         -- Terapkan kembali status untuk setiap fitur
         -- Ini akan menangani status 'on' dan 'off'
@@ -6815,6 +6605,9 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         ToggleShiftLock(IsShiftLockEnabled)
 
         -- [[ INTEGRASI KUNCI KECEPATAN ]] --
+        if character:FindFirstChildOfClass("Humanoid") then
+            speedLock_bindHumanoid(character:FindFirstChildOfClass("Humanoid"))
+        end
 
         -- Untuk fitur yang memerlukan logika khusus saat respawn
         if IsInvisibleGhostEnabled then
@@ -6841,10 +6634,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 StartFly()
             end
         end
-
-    if isAnimationLockEnabled then
-        startAnimationLock()
-    end
 
         -- [BARU] Deteksi animasi bawaan game (HANYA UNTUK R6)
         isGameAnimationOverrideActive = false -- Reset status saat respawn
@@ -7089,7 +6878,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     -- ====================================================================
     local function validateRoleWithServer(password, currentExpiration, currentRole)
         local success, passwordData = pcall(function()
-            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json")
+            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
             return HttpService:JSONDecode(rawData)
         end)
 
@@ -7128,7 +6917,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             -- Kata sandi yang tersimpan tidak lagi valid. Hapus sesi lama dan minta login.
             deleteSession()
             local success, passwordData = pcall(function()
-                local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json")
+                local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
                 return HttpService:JSONDecode(rawData)
             end)
             if success and passwordData then
@@ -7140,7 +6929,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     else
         -- Tidak ada kata sandi yang tersimpan, perlu login manual.
         local success, passwordData = pcall(function()
-            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json")
+            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
             return HttpService:JSONDecode(rawData)
         end)
         if success and passwordData then
