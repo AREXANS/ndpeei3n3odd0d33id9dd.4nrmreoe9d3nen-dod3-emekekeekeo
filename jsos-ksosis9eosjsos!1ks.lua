@@ -1023,6 +1023,61 @@ local function startAnimationLock()
     ExpirationLabel.Font = Enum.Font.SourceSans
     ExpirationLabel.Parent = MainFrame
     
+    local countdownConn
+    local logoutNotificationFrame = nil
+    countdownConn = RunService.Heartbeat:Connect(function()
+        if not ScreenGui or not ScreenGui.Parent then
+            countdownConn:Disconnect()
+            return
+        end
+
+        local remainingSeconds = expirationTimestamp - os.time()
+
+        if remainingSeconds <= 10 and remainingSeconds > 0 then
+            if not logoutNotificationFrame or not logoutNotificationFrame.Parent then
+                logoutNotificationFrame = Instance.new("Frame", ScreenGui)
+                logoutNotificationFrame.Name = "LogoutNotificationFrame"
+                logoutNotificationFrame.Size = UDim2.new(0, 300, 0, 50)
+                logoutNotificationFrame.Position = UDim2.new(0.5, -150, 0.1, 0)
+                logoutNotificationFrame.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                logoutNotificationFrame.BackgroundTransparency = 0.2
+                logoutNotificationFrame.BorderSizePixel = 0
+                local corner = Instance.new("UICorner", logoutNotificationFrame); corner.CornerRadius = UDim.new(0, 8)
+                local stroke = Instance.new("UIStroke", logoutNotificationFrame); stroke.Color = Color3.fromRGB(255, 100, 100); stroke.Thickness = 1
+                
+                local label = Instance.new("TextLabel", logoutNotificationFrame)
+                label.Name = "CountdownLabel"
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.SourceSansBold
+                label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                label.TextSize = 16
+                label.TextWrapped = true
+            end
+            local label = logoutNotificationFrame and logoutNotificationFrame:FindFirstChild("CountdownLabel")
+            if label then
+                label.Text = "Sesi akan berakhir & logout dalam " .. math.floor(remainingSeconds) .. " detik..."
+            end
+        end
+
+        if remainingSeconds < 1 then
+            countdownConn:Disconnect() -- Disconnect this timer itself
+            HandleLogout() -- Perform total shutdown and logout
+            return -- Stop the function
+        end
+
+        -- Update label text
+        local days = math.floor(remainingSeconds / 86400)
+        local rem = remainingSeconds % 86400
+        local hours = math.floor(rem / 3600)
+        rem = rem % 3600
+        local minutes = math.floor(rem / 60)
+        local seconds = rem % 60
+        if ExpirationLabel and ExpirationLabel.Parent then
+            ExpirationLabel.Text = string.format("Expires in: %dD %02dH %02dM %02dS", days, hours, minutes, seconds)
+        end
+    end)
+    
     local TabsFrame = Instance.new("ScrollingFrame")
     TabsFrame.Name = "TabsFrame"
     TabsFrame.Size = UDim2.new(0, 60, 1, -45) -- Lebar diperkecil
