@@ -6878,7 +6878,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     -- ====================================================================
     local function validateRoleWithServer(password, currentExpiration, currentRole)
         local success, passwordData = pcall(function()
-            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
+            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/cupapi/refs/heads/main/keksoeldlkdkd.json" .. "?t=" .. os.time())
             return HttpService:JSONDecode(rawData)
         end)
 
@@ -6917,7 +6917,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             -- Kata sandi yang tersimpan tidak lagi valid. Hapus sesi lama dan minta login.
             deleteSession()
             local success, passwordData = pcall(function()
-                local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
+                local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/cupapi/refs/heads/main/keksoeldlkdkd.json" .. "?t=" .. os.time())
                 return HttpService:JSONDecode(rawData)
             end)
             if success and passwordData then
@@ -6929,7 +6929,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     else
         -- Tidak ada kata sandi yang tersimpan, perlu login manual.
         local success, passwordData = pcall(function()
-            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json" .. "?t=" .. os.time())
+            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/cupapi/refs/heads/main/keksoeldlkdkd.json" .. "?t=" .. os.time())
             return HttpService:JSONDecode(rawData)
         end)
         if success and passwordData then
