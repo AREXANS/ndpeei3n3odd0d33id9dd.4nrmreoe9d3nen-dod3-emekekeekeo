@@ -1068,6 +1068,14 @@ task.spawn(function()
     RekamanTabContent.BackgroundTransparency = 1
     RekamanTabContent.Visible = false
     RekamanTabContent.Parent = ContentFrame
+
+    local GameTabContent = Instance.new("Frame")
+    GameTabContent.Name = "GameTab"
+    GameTabContent.Size = UDim2.new(1, -10, 1, -10)
+    GameTabContent.Position = UDim2.new(0, 5, 0, 5)
+    GameTabContent.BackgroundTransparency = 1
+    GameTabContent.Visible = false
+    GameTabContent.Parent = ContentFrame
     
     -- Menambahkan UIListLayout ke konten tab
     local PlayerListLayout = Instance.new("UIListLayout")
@@ -1576,7 +1584,13 @@ task.spawn(function()
     end
     
     local function switchTab(tabName)
-        PlayerTabContent.Visible = (tabName == "Player"); GeneralTabContent.Visible = (tabName == "Umum"); TeleportTabContent.Visible = (tabName == "Teleport"); VipTabContent.Visible = (tabName == "VIP"); SettingsTabContent.Visible = (tabName == "Pengaturan"); RekamanTabContent.Visible = (tabName == "Rekaman")
+    PlayerTabContent.Visible = (tabName == "Player")
+    GeneralTabContent.Visible = (tabName == "Umum")
+    TeleportTabContent.Visible = (tabName == "Teleport")
+    VipTabContent.Visible = (tabName == "VIP")
+    SettingsTabContent.Visible = (tabName == "Pengaturan")
+    RekamanTabContent.Visible = (tabName == "Rekaman")
+    GameTabContent.Visible = (tabName == "Game")
         if tabName == "Player" and updatePlayerList then updatePlayerList() end
     end
     
@@ -1588,6 +1602,7 @@ task.spawn(function()
     local GeneralTabButton = createTabButton("Umum", TabsFrame)
     local TeleportTabButton = createTabButton("Teleport", TabsFrame)
     local RekamanTabButton = createTabButton("Rekaman", TabsFrame)
+    local GameTabButton = createTabButton("Game", TabsFrame)
     local VipTabButton = createTabButton("VIP", TabsFrame)
     local SettingsTabButton = createTabButton("Pengaturan", TabsFrame)
     
