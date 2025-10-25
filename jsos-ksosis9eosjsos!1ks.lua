@@ -346,7 +346,7 @@ function showRecordingFilePicker(RECORDING_FOLDER, callback)
     end)
 end
 
-local SCRIPT_URL = "https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/Arexanstools.lua" -- << WAJIB DIISI!
+local SCRIPT_URL = "https://raw.githubusercontent.com/AREXANS/ndpeei3n3odd0d33id9dd.4nrmreoe9d3nen-dod3-emekekeekeo/refs/heads/main/jsos-ksosis9eosjsos!1ks.lua" -- << WAJIB DIISI!
 
 -- Mencegah GUI dibuat berulang kali jika skrip dieksekusi lebih dari sekali tanpa me-refresh game.
 if game:GetService("CoreGui"):FindFirstChild("ArexanstoolsGUI") then
