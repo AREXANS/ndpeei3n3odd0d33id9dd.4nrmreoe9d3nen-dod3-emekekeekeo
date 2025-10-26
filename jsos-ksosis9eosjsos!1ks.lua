@@ -1076,6 +1076,10 @@ task.spawn(function()
     GameTabContent.BackgroundTransparency = 1
     GameTabContent.Visible = false
     GameTabContent.Parent = ContentFrame
+
+    local GameListLayout = Instance.new("UIListLayout")
+    GameListLayout.Padding = UDim.new(0, 5)
+    GameListLayout.Parent = GameTabContent
     
     -- Menambahkan UIListLayout ke konten tab
     local PlayerListLayout = Instance.new("UIListLayout")
@@ -4893,6 +4897,49 @@ task.spawn(function()
         return sliderFrame
     end
     
+    local function createTextBox(parent, name, defaultValue, callback)
+        local textBoxFrame = Instance.new("Frame", parent)
+        textBoxFrame.Size = UDim2.new(1, 0, 0, 25) -- Adjusted height
+        textBoxFrame.BackgroundTransparency = 1
+
+        local layout = Instance.new("UIListLayout", textBoxFrame)
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.VerticalAlignment = Enum.VerticalAlignment.Center
+        layout.Padding = UDim.new(0, 5)
+
+        local titleLabel = Instance.new("TextLabel", textBoxFrame)
+        titleLabel.Size = UDim2.new(0.6, -5, 1, 0) -- 60% width, minus padding
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        titleLabel.TextSize = 12
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Text = name
+        titleLabel.Font = Enum.Font.SourceSans
+
+        local textBox = Instance.new("TextBox", textBoxFrame)
+        textBox.Size = UDim2.new(0.4, 0, 1, 0) -- 40% width
+        textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        textBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+        textBox.Text = tostring(defaultValue)
+        textBox.Font = Enum.Font.SourceSans
+        textBox.TextSize = 12
+        textBox.ClearTextOnFocus = false
+        local tbCorner = Instance.new("UICorner", textBox)
+        tbCorner.CornerRadius = UDim.new(0, 5)
+
+        textBox.FocusLost:Connect(function(enterPressed)
+            local value = tonumber(textBox.Text)
+            if value then
+                callback(value)
+                saveFeatureStates()
+            else
+                textBox.Text = tostring(defaultValue)
+            end
+        end)
+
+        return textBoxFrame
+    end
+    
     local function createToggle(parent, name, initialState, callback)
         local toggleFrame = Instance.new("Frame", parent); toggleFrame.Size = UDim2.new(1, 0, 0, 25); toggleFrame.BackgroundTransparency = 1; local toggleLabel = Instance.new("TextLabel", toggleFrame); toggleLabel.Size = UDim2.new(0.8, -10, 1, 0); toggleLabel.Position = UDim2.new(0, 5, 0, 0); toggleLabel.BackgroundTransparency = 1; toggleLabel.Text = name; toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); toggleLabel.TextSize = 12; toggleLabel.TextXAlignment = Enum.TextXAlignment.Left; toggleLabel.Font = Enum.Font.SourceSans
         local switch = Instance.new("TextButton", toggleFrame); switch.Name = "Switch"; switch.Size = UDim2.new(0, 40, 0, 20); switch.Position = UDim2.new(1, -50, 0.5, -10); switch.BackgroundColor3 = Color3.fromRGB(50, 50, 50); switch.BorderSizePixel = 0; switch.Text = ""; local switchCorner = Instance.new("UICorner", switch); switchCorner.CornerRadius = UDim.new(1, 0)
@@ -5097,11 +5144,11 @@ task.spawn(function()
     local function setupGeneralTab()
         createToggle(GeneralTabContent, "ESP Nama", IsEspNameEnabled, ToggleESPName)
         createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
-        createSlider(GeneralTabContent, "Kecepatan Jalan", 0, Settings.MaxWalkSpeed, Settings.WalkSpeed, "", 1, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
+        createTextBox(GeneralTabContent, "Kecepatan Jalan", Settings.WalkSpeed, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
         createToggle(GeneralTabContent, "Jalan Cepat", IsWalkSpeedEnabled, function(v) IsWalkSpeedEnabled = v; ToggleWalkSpeed(v) end)
         
         -- [[ INTEGRASI KUNCI KECEPATAN UI ]] --
-        createSlider(GeneralTabContent, "Kecepatan Terkunci", 0, 200, speedLock_currentSpeed, "", 1, function(v) 
+        createTextBox(GeneralTabContent, "Kecepatan Terkunci", speedLock_currentSpeed, function(v) 
             speedLock_currentSpeed = v
             if speedLock_isEnforced and speedLock_canEnforce() then
                 speedLock_setWalkSpeed(speedLock_humanoid, speedLock_currentSpeed)
@@ -5122,18 +5169,16 @@ task.spawn(function()
                     table.insert(speedLock_connections, conn)
                 end
                 if speedLock_canEnforce() then speedLock_setWalkSpeed(h, speedLock_currentSpeed) end
-                showNotification("Kunci Kecepatan diaktifkan", Color3.fromRGB(50, 200, 50))
             else
                 speedLock_disconnectAll()
                 speedLock_applyDisabledState()
                 -- Re-bind essential listeners after disconnecting all
                 task.wait(0.1)
                 speedLock_bindHumanoid(h)
-                showNotification("Kunci Kecepatan dinonaktifkan", Color3.fromRGB(200, 150, 50))
             end
         end)
         
-        createSlider(GeneralTabContent, "Kecepatan Terbang", 0, Settings.MaxFlySpeed, Settings.FlySpeed, "", 0.1, function(v) Settings.FlySpeed = v end)
+        createTextBox(GeneralTabContent, "Kecepatan Terbang", Settings.FlySpeed, function(v) Settings.FlySpeed = v end)
         createToggle(GeneralTabContent, "Terbang", IsFlying, function(v) if v then if UserInputService.TouchEnabled then StartMobileFly() else StartFly() end else if UserInputService.TouchEnabled then StopMobileFly() else StopFly() end end end)
         createToggle(GeneralTabContent, "Noclip", IsNoclipEnabled, function(v) ToggleNoclip(v) end)
         createToggle(GeneralTabContent, "Infinity Jump", IsInfinityJumpEnabled, function(v) IsInfinityJumpEnabled = v; saveFeatureStates(); if v then if LocalPlayer.Character and LocalPlayer.Character.Humanoid then infinityJumpConnection = ConnectEvent(UserInputService.JumpRequest, function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end elseif infinityJumpConnection then infinityJumpConnection:Disconnect(); infinityJumpConnection = nil end end)
@@ -6468,6 +6513,13 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     setupVipTab()
     setupSettingsTab()
     setupRekamanTab()
+
+    local function setupGameTab()
+        createButton(GameTabContent, "Game Perang", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/Game/Game%20Perang.Lua"))()
+        end)
+    end
+    setupGameTab()
 
     MakeDraggable(MainFrame, TitleBar, function() return true end, nil)
 
