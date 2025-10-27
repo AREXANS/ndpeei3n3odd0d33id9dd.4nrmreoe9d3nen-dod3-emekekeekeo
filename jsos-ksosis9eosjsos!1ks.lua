@@ -735,6 +735,7 @@ task.spawn(function()
         copyMovementConnection = nil
         copyAnimationCache = {}
         copyMovementMovers = {}
+        copyMovementBuffer = {}
 
         -- [[ VARIABEL UNTUK FITUR KUNCI KECEPATAN ]] --
         local speedLock_currentSpeed = 16
@@ -2683,33 +2684,41 @@ task.spawn(function()
     stopCopyMovement = function()
         if not isCopyingMovement then return end
 
+        isCopyingMovement = false
         if copyMovementConnection then
             copyMovementConnection:Disconnect()
             copyMovementConnection = nil
         end
 
-        if copyMovementMovers.attachment and copyMovementMovers.attachment.Parent then
-            copyMovementMovers.attachment:Destroy()
+        -- Hancurkan physics movers
+        for _, mover in pairs(copyMovementMovers) do
+            if mover and mover.Parent then pcall(function() mover:Destroy() end) end
         end
         copyMovementMovers = {}
 
-        local previousCopiedPlayer = copiedPlayer -- Store for UI update
-        isCopyingMovement = false
-        copiedPlayer = nil
-
+        -- Reset buffer dan cache
+        copyMovementBuffer = {}
+        copyAnimationCache = {}
+        
+        -- Reset state karakter lokal
         local char = LocalPlayer.Character
         if char then
             local humanoid = char:FindFirstChildOfClass("Humanoid")
             if humanoid then
-                -- Stop all cached animations
-                for id, track in pairs(copyAnimationCache) do
-                    if track and track.IsPlaying then
+                -- Hentikan semua animasi yang sedang berjalan dari fitur ini
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    if track.Name == "CopyMovementAnim" then
                         track:Stop(0.1)
                     end
                 end
+                -- Kembalikan state normal
+                humanoid.AutoRotate = true
+                humanoid.WalkSpeed = OriginalWalkSpeed
             end
         end
-        copyAnimationCache = {}
+
+        local previousCopiedPlayer = copiedPlayer
+        copiedPlayer = nil
 
         if previousCopiedPlayer then
             showNotification("Berhenti mengikuti " .. previousCopiedPlayer.DisplayName, Color3.fromRGB(200, 150, 50))
@@ -2721,7 +2730,7 @@ task.spawn(function()
     startCopyMovement = function(targetPlayer)
         if isCopyingMovement then
             stopCopyMovement()
-            task.wait(0.1) -- Brief pause to ensure everything is reset
+            task.wait(0.1) 
         end
 
         local localChar = LocalPlayer.Character
@@ -2739,8 +2748,8 @@ task.spawn(function()
 
         isCopyingMovement = true
         copiedPlayer = targetPlayer
+        copyMovementBuffer = {} 
         
-        -- Create physics movers
         pcall(function()
             local attachment = Instance.new("Attachment", localHrp)
             attachment.Name = "CopyMovementAttachment"
@@ -2748,17 +2757,20 @@ task.spawn(function()
             alignPos.Attachment0 = attachment
             alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
             alignPos.Responsiveness = 200
-            alignPos.MaxForce = 100000
+            alignPos.MaxForce = 9e9
             local alignOrient = Instance.new("AlignOrientation", attachment)
             alignOrient.Attachment0 = attachment
             alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
             alignOrient.Responsiveness = 200
-            alignOrient.MaxTorque = 100000
+            alignOrient.MaxTorque = 9e9
             copyMovementMovers = {attachment = attachment, alignPos = alignPos, alignOrient = alignOrient}
         end)
 
         showNotification("Mulai mengikuti " .. targetPlayer.DisplayName, Color3.fromRGB(50, 150, 255))
         if updatePlayerList then updatePlayerList() end
+
+        local lastTeleportTime = 0
+        local TELEPORT_COOLDOWN = 1.0
 
         copyMovementConnection = RunService.Heartbeat:Connect(function()
             if not isCopyingMovement or not copiedPlayer or not copiedPlayer.Parent then
@@ -2769,7 +2781,6 @@ task.spawn(function()
             local lChar = LocalPlayer.Character
             local lHrp = lChar and lChar:FindFirstChild("HumanoidRootPart")
             local lHumanoid = lChar and lChar:FindFirstChildOfClass("Humanoid")
-
             local tChar = copiedPlayer.Character
             local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
             local tHumanoid = tChar and tChar:FindFirstChildOfClass("Humanoid")
@@ -2779,34 +2790,83 @@ task.spawn(function()
                 return
             end
 
-            -- Copy CFrame using physics movers
-            local targetCFrame = tHrp.CFrame * CFrame.new(0, 0, 2)
-            copyMovementMovers.alignPos.Position = targetCFrame.Position
-            copyMovementMovers.alignOrient.CFrame = targetCFrame
+            local currentTime = tick()
+            local targetTime = currentTime - copyMovementDelay
 
-            -- Copy Animations
-            local requiredAnims = {}
-            for _, track in ipairs(tHumanoid:GetPlayingAnimationTracks()) do
-                local animId = track.Animation.AnimationId
-                requiredAnims[animId] = true
-                
-                if not copyAnimationCache[animId] then
-                    local anim = Instance.new("Animation")
-                    anim.AnimationId = animId
-                    copyAnimationCache[animId] = lHumanoid:LoadAnimation(anim)
+            local latestFrame = {
+                time = currentTime,
+                cframe = tHrp.CFrame,
+                state = tHumanoid:GetState(),
+                jump = tHumanoid.Jump,
+                anims = {}
+            }
+            if not copyMovementBypassAnimation then
+                for _, track in ipairs(tHumanoid:GetPlayingAnimationTracks()) do
+                    table.insert(latestFrame.anims, {id = track.Animation.AnimationId, time = track.TimePosition, speed = track.Speed})
                 end
+            end
+            table.insert(copyMovementBuffer, latestFrame)
 
-                local localTrack = copyAnimationCache[animId]
-                if not localTrack.IsPlaying then
-                    localTrack:Play(0.1)
-                end
-                localTrack.TimePosition = track.TimePosition
-                localTrack:AdjustSpeed(track.Speed)
+            while #copyMovementBuffer > 0 and copyMovementBuffer[1].time < targetTime - 1 do
+                table.remove(copyMovementBuffer, 1)
             end
 
-            for id, track in pairs(copyAnimationCache) do
-                if not requiredAnims[id] and track.IsPlaying then
-                    track:Stop(0.1)
+            local frame1, frame2
+            for i = 1, #copyMovementBuffer do
+                if copyMovementBuffer[i].time >= targetTime then
+                    frame2 = copyMovementBuffer[i]
+                    frame1 = copyMovementBuffer[i-1] or frame2
+                    break
+                end
+            end
+
+            if not frame1 then return end
+
+            local timeDiff = frame2.time - frame1.time
+            local alpha = (timeDiff > 0.001) and math.clamp((targetTime - frame1.time) / timeDiff, 0, 1) or 1
+            
+            local distanceBetweenFrames = (frame2.cframe.Position - frame1.cframe.Position).Magnitude
+            if distanceBetweenFrames > 50 and currentTime > lastTeleportTime + TELEPORT_COOLDOWN then
+                lChar:SetPrimaryPartCFrame(frame2.cframe)
+                lastTeleportTime = currentTime
+                return -- Skip physics interpolation for this frame
+            end
+
+            local interpolatedCFrame = frame1.cframe:Lerp(frame2.cframe, alpha)
+            copyMovementMovers.alignPos.Position = interpolatedCFrame.Position
+            copyMovementMovers.alignOrient.CFrame = interpolatedCFrame
+
+            if copyMovementBypassAnimation then
+                local stateToApply = frame1.state
+                if lHumanoid:GetState() ~= stateToApply then
+                    lHumanoid:ChangeState(stateToApply)
+                end
+                if frame1.jump then
+                    lHumanoid.Jump = true
+                end
+                
+                for id, track in pairs(copyAnimationCache) do
+                    if track.IsPlaying then track:Stop(0.1) end
+                end
+                copyAnimationCache = {}
+            else
+                local requiredAnims = {}
+                for _, animData in ipairs(frame1.anims) do
+                    requiredAnims[animData.id] = true
+                    if not copyAnimationCache[animData.id] then
+                        local anim = Instance.new("Animation")
+                        anim.AnimationId = animData.id
+                        local loadedTrack = lHumanoid:LoadAnimation(anim)
+                        loadedTrack.Name = "CopyMovementAnim"
+                        copyAnimationCache[animData.id] = loadedTrack
+                    end
+                    local localTrack = copyAnimationCache[animData.id]
+                    if not localTrack.IsPlaying then localTrack:Play(0.1) end
+                    localTrack.TimePosition = animData.time
+                    localTrack:AdjustSpeed(animData.speed)
+                end
+                for id, track in pairs(copyAnimationCache) do
+                    if not requiredAnims[id] and track.IsPlaying then track:Stop(0.1) end
                 end
             end
         end)
