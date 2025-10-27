@@ -1570,6 +1570,7 @@ task.spawn(function()
         local flingButton = button:FindFirstChild("FlingButton", true)
         if flingButton then
             flingButton.BackgroundColor3 = (currentFlingTarget == player) and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(80, 80, 80)
+            flingButton.Visible = showFlingIcon
         end
     
         local recButton = button:FindFirstChild("RecordPlayerButton", true)
@@ -1583,6 +1584,12 @@ task.spawn(function()
         if copyMovementButton then
             local isCopyingThisPlayer = isCopyingMovement and copiedPlayer == player
             copyMovementButton.BackgroundColor3 = isCopyingThisPlayer and Color3.fromRGB(40, 200, 40) or Color3.fromRGB(80, 80, 80)
+            copyMovementButton.Visible = showCopyMovementIcon
+        end
+
+        local teleportButton = button:FindFirstChild("TeleportButton", true)
+        if teleportButton then
+            teleportButton.Visible = showTeleportIcon
         end
     end
     
@@ -5362,40 +5369,60 @@ task.spawn(function()
             local isSettingsVisible = not PlayerSettingsFrame.Visible
             PlayerSettingsFrame.Visible = isSettingsVisible
             PlayerListContainer.Visible = not isSettingsVisible
-            searchFrame.Visible = not isSettingsVisible
+            
             if isSettingsVisible then
+                -- Beralih ke Tampilan Pengaturan
+                playerHeaderFrame.Size = UDim2.new(1, 0, 0, 30)
+                PlayerSettingsFrame.Position = UDim2.new(0, 0, 0, 30)
+                PlayerSettingsFrame.Size = UDim2.new(1, 0, 1, -30)
+                searchFrame.Visible = false
+                refreshButton.Visible = false
                 settingsButton.Text = "◀"
                 playerCountLabel.Text = "Pengaturan Player"
             else
+                -- Beralih kembali ke Tampilan Daftar Pemain
+                playerHeaderFrame.Size = UDim2.new(1, 0, 0, 55)
+                PlayerSettingsFrame.Position = UDim2.new(0, 0, 0, 55)
+                PlayerSettingsFrame.Size = UDim2.new(1, 0, 1, -55)
+                searchFrame.Visible = true
+                refreshButton.Visible = true
                 settingsButton.Text = "⚙️"
                 playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers()
             end
         end)
 
         -- Populate the settings frame
-        createToggle(PlayerSettingsFrame, "Show Copy Movement Icon 👯", showCopyMovementIcon, function(v) showCopyMovementIcon = v; saveFeatureStates(); updatePlayerList() end)
-        local copyMovementSettingsLabel = Instance.new("TextLabel", PlayerSettingsFrame)
-        copyMovementSettingsLabel.Text = "   Settings mengikuti player 👯"
-        copyMovementSettingsLabel.Size = UDim2.new(1, 0, 0, 20)
-        copyMovementSettingsLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
-        copyMovementSettingsLabel.TextXAlignment = Enum.TextXAlignment.Left
-        copyMovementSettingsLabel.Font = Enum.Font.SourceSans
-        copyMovementSettingsLabel.TextSize = 12
-        copyMovementSettingsLabel.BackgroundTransparency = 1
-        createTextBox(PlayerSettingsFrame, "Jeda waktu textbox", copyMovementDelay, function(v) copyMovementDelay = v; saveFeatureStates() end)
-        createToggle(PlayerSettingsFrame, "Bypass animasi on/off", copyMovementBypassAnimation, function(v) copyMovementBypassAnimation = v; saveFeatureStates() end)
-        
-        createToggle(PlayerSettingsFrame, "Show Fling Icon ☠️", showFlingIcon, function(v) showFlingIcon = v; saveFeatureStates(); updatePlayerList() end)
-        local flingSettingsLabel = Instance.new("TextLabel", PlayerSettingsFrame)
-        flingSettingsLabel.Text = "   Settings auto target fling player"
-        flingSettingsLabel.Size = UDim2.new(1, 0, 0, 20)
-        flingSettingsLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
-        flingSettingsLabel.TextXAlignment = Enum.TextXAlignment.Left
-        flingSettingsLabel.Font = Enum.Font.SourceSans
-        flingSettingsLabel.TextSize = 12
-        flingSettingsLabel.BackgroundTransparency = 1
-        createToggle(PlayerSettingsFrame, "Invisible fling on/off", flingInvisible, function(v) flingInvisible = v; saveFeatureStates() end)
 
+        -- Pengaturan Copy Movement
+        local jedaWaktuBox, bypassAnimToggle
+        
+        local copyMovementToggle, copyMovementSwitch = createToggle(PlayerSettingsFrame, "Show Copy Movement Icon 👯", showCopyMovementIcon, function(v) 
+            showCopyMovementIcon = v
+            if jedaWaktuBox then jedaWaktuBox.Visible = v end
+            if bypassAnimToggle then bypassAnimToggle.Visible = v end
+            saveFeatureStates()
+            updatePlayerList() 
+        end)
+
+        jedaWaktuBox = createTextBox(PlayerSettingsFrame, "Jeda Waktu", copyMovementDelay, function(v) copyMovementDelay = v; saveFeatureStates() end)
+        jedaWaktuBox.Visible = showCopyMovementIcon
+
+        bypassAnimToggle = createToggle(PlayerSettingsFrame, "Bypass animasi", copyMovementBypassAnimation, function(v) copyMovementBypassAnimation = v; saveFeatureStates() end)
+        bypassAnimToggle.Visible = showCopyMovementIcon
+
+        -- Pengaturan Fling
+        local invisibleFlingToggle
+        local flingToggle, flingSwitch = createToggle(PlayerSettingsFrame, "Show Fling Icon ☠️", showFlingIcon, function(v) 
+            showFlingIcon = v 
+            if invisibleFlingToggle then invisibleFlingToggle.Visible = v end
+            saveFeatureStates()
+            updatePlayerList() 
+        end)
+        
+        invisibleFlingToggle = createToggle(PlayerSettingsFrame, "Invisible fling", flingInvisible, function(v) flingInvisible = v; saveFeatureStates() end)
+        invisibleFlingToggle.Visible = showFlingIcon
+
+        -- Pengaturan Teleport
         createToggle(PlayerSettingsFrame, "Show Teleport Icon 🌀", showTeleportIcon, function(v) showTeleportIcon = v; saveFeatureStates(); updatePlayerList() end)
 
         local function createPlayerButton(player)
