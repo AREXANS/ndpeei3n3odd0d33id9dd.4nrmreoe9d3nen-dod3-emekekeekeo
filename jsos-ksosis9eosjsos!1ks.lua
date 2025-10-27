@@ -1534,7 +1534,7 @@ task.spawn(function()
         local button = PlayerButtons[player.UserId]
         if not button or not button.Parent then return end
     
-        local distLabel = button:FindFirstChild("DistanceLabel")
+        local distLabel = button:FindFirstChild("DistanceLabel", true)
         if distLabel then
             local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             local targetHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -4983,12 +4983,15 @@ task.spawn(function()
         local searchButton = Instance.new("TextButton", searchFrame); searchButton.Size = UDim2.new(0.3, 0, 1, 0); searchButton.Position = UDim2.new(0.7, 0, 0, 0); searchButton.BackgroundColor3 = Color3.fromRGB(0, 150,  255); searchButton.BorderSizePixel = 0; searchButton.Text = "Cari"; searchButton.TextColor3 = Color3.fromRGB(255, 255, 255); searchButton.TextSize = 12; searchButton.Font = Enum.Font.SourceSansBold; local sbtnCorner = Instance.new("UICorner", searchButton); sbtnCorner.CornerRadius = UDim.new(0, 5)
         
         local function createPlayerButton(player)
-            local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.Size = UDim2.new(1, 0, 0, 35); playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name
-            
-            local avatarImage = Instance.new("ImageButton", playerFrame)
+            local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.AutomaticSize = Enum.AutomaticSize.Y; playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name; playerFrame.Size = UDim2.new(1,0,0,0);
+            local mainLayout = Instance.new("UIListLayout", playerFrame); mainLayout.FillDirection = Enum.FillDirection.Vertical; mainLayout.Padding = UDim.new(0, 2);
+
+            local topFrame = Instance.new("Frame", playerFrame); topFrame.Size = UDim2.new(1,0,0,30); topFrame.BackgroundTransparency = 1;
+            local topLayout = Instance.new("UIListLayout", topFrame); topLayout.FillDirection = Enum.FillDirection.Horizontal; topLayout.VerticalAlignment = Enum.VerticalAlignment.Center; topLayout.Padding = UDim.new(0, 5);
+
+            local avatarImage = Instance.new("ImageButton", topFrame)
             avatarImage.Name = "AvatarImageButton"
             avatarImage.Size = UDim2.new(0, 25, 0, 25)
-            avatarImage.Position = UDim2.new(0, 5, 0.5, -12.5)
             avatarImage.BackgroundTransparency = 1
             avatarImage.AutoButtonColor = false
             pcall(function() avatarImage.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
@@ -5005,32 +5008,57 @@ task.spawn(function()
             avatarImage.MouseButton1Click:Connect(function()
                 startSpectate(player)
             end)
-            
-            local displaynameLabel = Instance.new("TextLabel", playerFrame); displaynameLabel.Size = UDim2.new(1, -100, 0, 15); displaynameLabel.Position = UDim2.new(0, 35, 0, 2); displaynameLabel.BackgroundTransparency = 1; displaynameLabel.TextXAlignment = Enum.TextXAlignment.Left; displaynameLabel.Text = player.DisplayName; displaynameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); displaynameLabel.TextSize = 10; displaynameLabel.Font = Enum.Font.SourceSansSemibold
-            local usernameLabel = Instance.new("TextLabel", playerFrame); usernameLabel.Size = UDim2.new(1, -100, 0, 12); usernameLabel.Position = UDim2.new(0, 35, 0, 18); usernameLabel.BackgroundTransparency = 1; usernameLabel.TextXAlignment = Enum.TextXAlignment.Left; usernameLabel.Text = "@" .. player.Name; usernameLabel.TextColor3 = Color3.fromRGB(150, 150, 150); usernameLabel.TextSize = 8; usernameLabel.Font = Enum.Font.SourceSans
-            local distanceLabel = Instance.new("TextLabel", playerFrame); distanceLabel.Name = "DistanceLabel"; distanceLabel.Size = UDim2.new(1, -100, 0, 12); distanceLabel.Position = UDim2.new(0, 35, 0, 30); distanceLabel.BackgroundTransparency = 1; distanceLabel.TextXAlignment = Enum.TextXAlignment.Left; distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 127); distanceLabel.TextSize = 9; distanceLabel.Font = Enum.Font.SourceSansSemibold
-            
-            local actionsFrame = Instance.new("Frame", playerFrame)
+
+            local textFrame = Instance.new("Frame", topFrame); textFrame.Size = UDim2.new(1,-65,1,0); textFrame.BackgroundTransparency = 1;
+            local textLayout = Instance.new("UIListLayout", textFrame); textLayout.FillDirection = Enum.FillDirection.Vertical; textLayout.Padding = UDim.new(0,0);
+
+            local infoFrame = Instance.new("Frame", textFrame); infoFrame.Size = UDim2.new(1,0,0,15); infoFrame.BackgroundTransparency = 1;
+            local infoLayout = Instance.new("UIListLayout", infoFrame); infoLayout.FillDirection = Enum.FillDirection.Horizontal; infoLayout.VerticalAlignment = Enum.VerticalAlignment.Center; infoLayout.Padding = UDim.new(0, 4);
+
+            local distanceLabel = Instance.new("TextLabel", infoFrame); distanceLabel.Name = "DistanceLabel"; distanceLabel.Size = UDim2.new(0, 0, 0, 12); distanceLabel.AutomaticSize = Enum.AutomaticSize.X; distanceLabel.BackgroundTransparency = 1; distanceLabel.TextXAlignment = Enum.TextXAlignment.Left; distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 127); distanceLabel.TextSize = 9; distanceLabel.Font = Enum.Font.SourceSansSemibold
+            local usernameLabel = Instance.new("TextLabel", infoFrame); usernameLabel.Size = UDim2.new(0,0,0,12); usernameLabel.AutomaticSize = Enum.AutomaticSize.X; usernameLabel.BackgroundTransparency = 1; usernameLabel.TextXAlignment = Enum.TextXAlignment.Left; usernameLabel.Text = "@" .. player.Name; usernameLabel.TextColor3 = Color3.fromRGB(150, 150, 150); usernameLabel.TextSize = 8; usernameLabel.Font = Enum.Font.SourceSans
+
+            local displaynameLabel = Instance.new("TextLabel", textFrame); displaynameLabel.Size = UDim2.new(1, 0, 0, 15); displaynameLabel.BackgroundTransparency = 1; displaynameLabel.TextXAlignment = Enum.TextXAlignment.Left; displaynameLabel.Text = player.DisplayName; displaynameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); displaynameLabel.TextSize = 10; displaynameLabel.Font = Enum.Font.SourceSansSemibold
+
+            local toggleButton = Instance.new("TextButton", topFrame)
+            toggleButton.Name = "ToggleActionsButton"
+            toggleButton.Size = UDim2.new(0, 25, 0, 25)
+            toggleButton.BackgroundTransparency = 1
+            toggleButton.BorderSizePixel = 0
+            toggleButton.Font = Enum.Font.SourceSansBold
+            toggleButton.Text = "▼"
+            toggleButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+            toggleButton.TextSize = 20
+
+            local bottomFrame = Instance.new("Frame", playerFrame); bottomFrame.Size = UDim2.new(1,0,0,22); bottomFrame.BackgroundTransparency = 1;
+            bottomFrame.Visible = false
+
+            toggleButton.MouseButton1Click:Connect(function()
+                bottomFrame.Visible = not bottomFrame.Visible
+                toggleButton.Text = bottomFrame.Visible and "▲" or "▼"
+            end)
+
+            local actionsFrame = Instance.new("Frame", bottomFrame)
             actionsFrame.Name = "ActionsFrame"
-            actionsFrame.Size = UDim2.new(0, 60, 0, 16)
-            actionsFrame.Position = UDim2.new(1, -65, 0.5, -8)
+            actionsFrame.Size = UDim2.new(1, 0, 1, 0) -- Fill the bottom frame
+            actionsFrame.Position = UDim2.new(0,0,0,0)
             actionsFrame.BackgroundTransparency = 1
 
             local actionsLayout = Instance.new("UIListLayout", actionsFrame)
             actionsLayout.FillDirection = Enum.FillDirection.Horizontal
-            actionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+            actionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Center the icons
             actionsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-            actionsLayout.Padding = UDim.new(0, 2)
+            actionsLayout.Padding = UDim.new(0, 5) -- Increased padding
             
             local flingButton = Instance.new("TextButton", actionsFrame)
             flingButton.Name = "FlingButton"
-            flingButton.Size = UDim2.new(0, 16, 0, 16)
+            flingButton.Size = UDim2.new(0, 22, 0, 22)
             flingButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
             flingButton.BorderSizePixel = 0
             flingButton.Font = Enum.Font.SourceSansBold
             flingButton.Text = "☠️"
             flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            flingButton.TextSize = 10
+            flingButton.TextSize = 12
             local flingCorner = Instance.new("UICorner", flingButton); flingCorner.CornerRadius = UDim.new(0, 4)
             flingButton.MouseButton1Click:Connect(function()
                 ToggleFlingOnPlayer(player)
@@ -5038,13 +5066,13 @@ task.spawn(function()
     
             local newTeleportButton = Instance.new("TextButton", actionsFrame)
             newTeleportButton.Name = "TeleportButton"
-            newTeleportButton.Size = UDim2.new(0, 16, 0, 16)
+            newTeleportButton.Size = UDim2.new(0, 22, 0, 22)
             newTeleportButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
             newTeleportButton.BorderSizePixel = 0
             newTeleportButton.Font = Enum.Font.SourceSansBold
             newTeleportButton.Text = "🌀"
             newTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            newTeleportButton.TextSize = 10
+            newTeleportButton.TextSize = 12
             local tpCorner = Instance.new("UICorner", newTeleportButton); tpCorner.CornerRadius = UDim.new(0, 4)
             
             newTeleportButton.MouseButton1Click:Connect(function()
@@ -5072,13 +5100,13 @@ task.spawn(function()
 
             local copyMovementButton = Instance.new("TextButton", actionsFrame)
             copyMovementButton.Name = "CopyMovementButton"
-            copyMovementButton.Size = UDim2.new(0, 16, 0, 16)
+            copyMovementButton.Size = UDim2.new(0, 22, 0, 22)
             copyMovementButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Default color
             copyMovementButton.BorderSizePixel = 0
             copyMovementButton.Font = Enum.Font.SourceSansBold
             copyMovementButton.Text = "👯"
             copyMovementButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            copyMovementButton.TextSize = 12
+            copyMovementButton.TextSize = 14
             local copyCorner = Instance.new("UICorner", copyMovementButton); copyCorner.CornerRadius = UDim.new(0, 5)
             copyMovementButton.MouseButton1Click:Connect(function()
                 toggleCopyMovement(player)
@@ -5283,12 +5311,15 @@ task.spawn(function()
         local searchButton = Instance.new("TextButton", searchFrame); searchButton.Size = UDim2.new(0.3, 0, 1, 0); searchButton.Position = UDim2.new(0.7, 0, 0, 0); searchButton.BackgroundColor3 = Color3.fromRGB(0, 150,  255); searchButton.BorderSizePixel = 0; searchButton.Text = "Cari"; searchButton.TextColor3 = Color3.fromRGB(255, 255, 255); searchButton.TextSize = 12; searchButton.Font = Enum.Font.SourceSansBold; local sbtnCorner = Instance.new("UICorner", searchButton); sbtnCorner.CornerRadius = UDim.new(0, 5)
         
         local function createPlayerButton(player)
-            local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.Size = UDim2.new(1, 0, 0, 35); playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name
-            
-            local avatarImage = Instance.new("ImageButton", playerFrame)
+            local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.AutomaticSize = Enum.AutomaticSize.Y; playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name; playerFrame.Size = UDim2.new(1,0,0,0);
+            local mainLayout = Instance.new("UIListLayout", playerFrame); mainLayout.FillDirection = Enum.FillDirection.Vertical; mainLayout.Padding = UDim.new(0, 2);
+
+            local topFrame = Instance.new("Frame", playerFrame); topFrame.Size = UDim2.new(1,0,0,30); topFrame.BackgroundTransparency = 1;
+            local topLayout = Instance.new("UIListLayout", topFrame); topLayout.FillDirection = Enum.FillDirection.Horizontal; topLayout.VerticalAlignment = Enum.VerticalAlignment.Center; topLayout.Padding = UDim.new(0, 5);
+
+            local avatarImage = Instance.new("ImageButton", topFrame)
             avatarImage.Name = "AvatarImageButton"
             avatarImage.Size = UDim2.new(0, 25, 0, 25)
-            avatarImage.Position = UDim2.new(0, 5, 0.5, -12.5)
             avatarImage.BackgroundTransparency = 1
             avatarImage.AutoButtonColor = false
             pcall(function() avatarImage.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
@@ -5305,32 +5336,57 @@ task.spawn(function()
             avatarImage.MouseButton1Click:Connect(function()
                 startSpectate(player)
             end)
-            
-            local displaynameLabel = Instance.new("TextLabel", playerFrame); displaynameLabel.Size = UDim2.new(1, -100, 0, 15); displaynameLabel.Position = UDim2.new(0, 35, 0, 2); displaynameLabel.BackgroundTransparency = 1; displaynameLabel.TextXAlignment = Enum.TextXAlignment.Left; displaynameLabel.Text = player.DisplayName; displaynameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); displaynameLabel.TextSize = 10; displaynameLabel.Font = Enum.Font.SourceSansSemibold
-            local usernameLabel = Instance.new("TextLabel", playerFrame); usernameLabel.Size = UDim2.new(1, -100, 0, 12); usernameLabel.Position = UDim2.new(0, 35, 0, 18); usernameLabel.BackgroundTransparency = 1; usernameLabel.TextXAlignment = Enum.TextXAlignment.Left; usernameLabel.Text = "@" .. player.Name; usernameLabel.TextColor3 = Color3.fromRGB(150, 150, 150); usernameLabel.TextSize = 8; usernameLabel.Font = Enum.Font.SourceSans
-            local distanceLabel = Instance.new("TextLabel", playerFrame); distanceLabel.Name = "DistanceLabel"; distanceLabel.Size = UDim2.new(1, -100, 0, 12); distanceLabel.Position = UDim2.new(0, 35, 0, 30); distanceLabel.BackgroundTransparency = 1; distanceLabel.TextXAlignment = Enum.TextXAlignment.Left; distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 127); distanceLabel.TextSize = 9; distanceLabel.Font = Enum.Font.SourceSansSemibold
-            
-            local actionsFrame = Instance.new("Frame", playerFrame)
+
+            local textFrame = Instance.new("Frame", topFrame); textFrame.Size = UDim2.new(1,-65,1,0); textFrame.BackgroundTransparency = 1;
+            local textLayout = Instance.new("UIListLayout", textFrame); textLayout.FillDirection = Enum.FillDirection.Vertical; textLayout.Padding = UDim.new(0,0);
+
+            local infoFrame = Instance.new("Frame", textFrame); infoFrame.Size = UDim2.new(1,0,0,15); infoFrame.BackgroundTransparency = 1;
+            local infoLayout = Instance.new("UIListLayout", infoFrame); infoLayout.FillDirection = Enum.FillDirection.Horizontal; infoLayout.VerticalAlignment = Enum.VerticalAlignment.Center; infoLayout.Padding = UDim.new(0, 4);
+
+            local distanceLabel = Instance.new("TextLabel", infoFrame); distanceLabel.Name = "DistanceLabel"; distanceLabel.Size = UDim2.new(0, 0, 0, 12); distanceLabel.AutomaticSize = Enum.AutomaticSize.X; distanceLabel.BackgroundTransparency = 1; distanceLabel.TextXAlignment = Enum.TextXAlignment.Left; distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 127); distanceLabel.TextSize = 9; distanceLabel.Font = Enum.Font.SourceSansSemibold
+            local usernameLabel = Instance.new("TextLabel", infoFrame); usernameLabel.Size = UDim2.new(0,0,0,12); usernameLabel.AutomaticSize = Enum.AutomaticSize.X; usernameLabel.BackgroundTransparency = 1; usernameLabel.TextXAlignment = Enum.TextXAlignment.Left; usernameLabel.Text = "@" .. player.Name; usernameLabel.TextColor3 = Color3.fromRGB(150, 150, 150); usernameLabel.TextSize = 8; usernameLabel.Font = Enum.Font.SourceSans
+
+            local displaynameLabel = Instance.new("TextLabel", textFrame); displaynameLabel.Size = UDim2.new(1, 0, 0, 15); displaynameLabel.BackgroundTransparency = 1; displaynameLabel.TextXAlignment = Enum.TextXAlignment.Left; displaynameLabel.Text = player.DisplayName; displaynameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); displaynameLabel.TextSize = 10; displaynameLabel.Font = Enum.Font.SourceSansSemibold
+
+            local toggleButton = Instance.new("TextButton", topFrame)
+            toggleButton.Name = "ToggleActionsButton"
+            toggleButton.Size = UDim2.new(0, 25, 0, 25)
+            toggleButton.BackgroundTransparency = 1
+            toggleButton.BorderSizePixel = 0
+            toggleButton.Font = Enum.Font.SourceSansBold
+            toggleButton.Text = "▼"
+            toggleButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+            toggleButton.TextSize = 20
+
+            local bottomFrame = Instance.new("Frame", playerFrame); bottomFrame.Size = UDim2.new(1,0,0,22); bottomFrame.BackgroundTransparency = 1;
+            bottomFrame.Visible = false
+
+            toggleButton.MouseButton1Click:Connect(function()
+                bottomFrame.Visible = not bottomFrame.Visible
+                toggleButton.Text = bottomFrame.Visible and "▲" or "▼"
+            end)
+
+            local actionsFrame = Instance.new("Frame", bottomFrame)
             actionsFrame.Name = "ActionsFrame"
-            actionsFrame.Size = UDim2.new(0, 60, 0, 16)
-            actionsFrame.Position = UDim2.new(1, -65, 0.5, -8)
+            actionsFrame.Size = UDim2.new(1, 0, 1, 0) -- Fill the bottom frame
+            actionsFrame.Position = UDim2.new(0,0,0,0)
             actionsFrame.BackgroundTransparency = 1
 
             local actionsLayout = Instance.new("UIListLayout", actionsFrame)
             actionsLayout.FillDirection = Enum.FillDirection.Horizontal
-            actionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+            actionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Center the icons
             actionsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-            actionsLayout.Padding = UDim.new(0, 2)
+            actionsLayout.Padding = UDim.new(0, 5) -- Increased padding
             
             local flingButton = Instance.new("TextButton", actionsFrame)
             flingButton.Name = "FlingButton"
-            flingButton.Size = UDim2.new(0, 16, 0, 16)
+            flingButton.Size = UDim2.new(0, 22, 0, 22)
             flingButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
             flingButton.BorderSizePixel = 0
             flingButton.Font = Enum.Font.SourceSansBold
             flingButton.Text = "☠️"
             flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            flingButton.TextSize = 10
+            flingButton.TextSize = 12
             local flingCorner = Instance.new("UICorner", flingButton); flingCorner.CornerRadius = UDim.new(0, 4)
             flingButton.MouseButton1Click:Connect(function()
                 ToggleFlingOnPlayer(player)
@@ -5338,13 +5394,13 @@ task.spawn(function()
     
             local newTeleportButton = Instance.new("TextButton", actionsFrame)
             newTeleportButton.Name = "TeleportButton"
-            newTeleportButton.Size = UDim2.new(0, 16, 0, 16)
+            newTeleportButton.Size = UDim2.new(0, 22, 0, 22)
             newTeleportButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
             newTeleportButton.BorderSizePixel = 0
             newTeleportButton.Font = Enum.Font.SourceSansBold
             newTeleportButton.Text = "🌀"
             newTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            newTeleportButton.TextSize = 10
+            newTeleportButton.TextSize = 12
             local tpCorner = Instance.new("UICorner", newTeleportButton); tpCorner.CornerRadius = UDim.new(0, 4)
             
             newTeleportButton.MouseButton1Click:Connect(function()
@@ -5372,13 +5428,13 @@ task.spawn(function()
 
             local copyMovementButton = Instance.new("TextButton", actionsFrame)
             copyMovementButton.Name = "CopyMovementButton"
-            copyMovementButton.Size = UDim2.new(0, 16, 0, 16)
+            copyMovementButton.Size = UDim2.new(0, 22, 0, 22)
             copyMovementButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Default color
             copyMovementButton.BorderSizePixel = 0
             copyMovementButton.Font = Enum.Font.SourceSansBold
             copyMovementButton.Text = "👯"
             copyMovementButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            copyMovementButton.TextSize = 12
+            copyMovementButton.TextSize = 14
             local copyCorner = Instance.new("UICorner", copyMovementButton); copyCorner.CornerRadius = UDim.new(0, 5)
             copyMovementButton.MouseButton1Click:Connect(function()
                 toggleCopyMovement(player)
