@@ -551,7 +551,7 @@ task.spawn(function()
     local antifling_velocity_threshold, antifling_angular_threshold, antifling_last_safe_cframe, antifling_enabled, antifling_connection
     local currentFlingTarget, flingLoopConnection, flingStartPosition, flingStatusGui
     local isRecording, isPlaying, recordingConnection, playbackConnection, savedRecordings, currentRecordingData, loadedRecordingName, currentRecordingTarget
-    local isCopyingMovement, copiedPlayer, copyMovementConnection, copyAnimationCache, copyMovementMovers
+    local isCopyingMovement, copiedPlayer, copyMovementConnection, copyAnimationCache, copyMovementMovers, copyMovementDelay, copyMovementBypassAnimation
     local isEmoteEnabled, EmoteScreenGui, isAnimationEnabled, AnimationScreenGui, lastAnimations
     local ScreenGui, MiniToggleContainer, MiniToggleButton, EmoteToggleButton, AnimationShowButton, MainFrame, TitleBar, ExpirationLabel, TabsFrame, ContentFrame
     local PlayerTabContent, PlayerListContainer, GeneralTabContent, TeleportTabContent, VipTabContent, SettingsTabContent, RekamanTabContent
@@ -588,6 +588,12 @@ task.spawn(function()
         IsGodModeEnabled = false 
         IsWalkSpeedEnabled = false
         OriginalWalkSpeed = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") and LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed or 16
+        showCopyMovementIcon = true
+        showFlingIcon = true
+        showTeleportIcon = true
+        copyMovementDelay = 0.1
+        copyMovementBypassAnimation = false
+        flingInvisible = false
         FlyConnections = {}
         godModeConnection = nil 
         IsInfinityJumpEnabled = false
@@ -1355,7 +1361,13 @@ task.spawn(function()
             FlySpeedValue = Settings.FlySpeed,
             FEInvisibleTransparencyValue = Settings.FEInvisibleTransparency,
             SpeedLockEnabled = speedLock_isEnforced,
-            SpeedLockValue = speedLock_currentSpeed
+            SpeedLockValue = speedLock_currentSpeed,
+            ShowCopyMovementIcon = showCopyMovementIcon,
+            ShowFlingIcon = showFlingIcon,
+            ShowTeleportIcon = showTeleportIcon,
+            CopyMovementDelay = copyMovementDelay,
+            CopyMovementBypassAnimation = copyMovementBypassAnimation,
+            FlingInvisible = flingInvisible
         }
         
         pcall(function()
@@ -1395,6 +1407,12 @@ task.spawn(function()
                 Settings.FEInvisibleTransparency = decodedData.FEInvisibleTransparencyValue or 0.75
                 speedLock_isEnforced = decodedData.SpeedLockEnabled or false
                 speedLock_currentSpeed = decodedData.SpeedLockValue or 16
+                showCopyMovementIcon = decodedData.ShowCopyMovementIcon ~= false
+                showFlingIcon = decodedData.ShowFlingIcon ~= false
+                showTeleportIcon = decodedData.ShowTeleportIcon ~= false
+                copyMovementDelay = decodedData.CopyMovementDelay or 0.1
+                copyMovementBypassAnimation = decodedData.CopyMovementBypassAnimation or false
+                flingInvisible = decodedData.FlingInvisible or false
             end
         end)
         if not success then
@@ -5063,6 +5081,7 @@ task.spawn(function()
             flingButton.MouseButton1Click:Connect(function()
                 ToggleFlingOnPlayer(player)
             end)
+            flingButton.Visible = showFlingIcon
     
             local newTeleportButton = Instance.new("TextButton", actionsFrame)
             newTeleportButton.Name = "TeleportButton"
@@ -5074,6 +5093,7 @@ task.spawn(function()
             newTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
             newTeleportButton.TextSize = 12
             local tpCorner = Instance.new("UICorner", newTeleportButton); tpCorner.CornerRadius = UDim.new(0, 4)
+            newTeleportButton.Visible = showTeleportIcon
             
             newTeleportButton.MouseButton1Click:Connect(function()
                 local localChar = LocalPlayer.Character
@@ -5111,6 +5131,7 @@ task.spawn(function()
             copyMovementButton.MouseButton1Click:Connect(function()
                 toggleCopyMovement(player)
             end)
+            copyMovementButton.Visible = showCopyMovementIcon
             
             return playerFrame
         end
@@ -5291,13 +5312,23 @@ task.spawn(function()
 
     setupPlayerTab = function()
         local playerHeaderFrame = Instance.new("Frame", PlayerTabContent); playerHeaderFrame.Size = UDim2.new(1, 0, 0, 55); playerHeaderFrame.BackgroundTransparency = 1
-        local playerCountLabel = Instance.new("TextLabel", playerHeaderFrame); playerCountLabel.Name = "PlayerCountLabel"; playerCountLabel.Size = UDim2.new(1, -20, 0, 15); playerCountLabel.BackgroundTransparency = 1; playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers(); playerCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255); playerCountLabel.TextSize = 12; playerCountLabel.TextXAlignment = Enum.TextXAlignment.Left; playerCountLabel.Font = Enum.Font.SourceSansBold
+        local playerCountLabel = Instance.new("TextLabel", playerHeaderFrame); playerCountLabel.Name = "PlayerCountLabel"; playerCountLabel.Size = UDim2.new(1, -40, 0, 15); playerCountLabel.BackgroundTransparency = 1; playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers(); playerCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255); playerCountLabel.TextSize = 12; playerCountLabel.TextXAlignment = Enum.TextXAlignment.Left; playerCountLabel.Font = Enum.Font.SourceSansBold
         
         local refreshButton = Instance.new("TextButton", playerHeaderFrame)
         refreshButton.Name = "RefreshButton"
         refreshButton.Size = UDim2.new(0, 15, 0, 15); refreshButton.Position = UDim2.new(1, -15, 0, 0); refreshButton.BackgroundTransparency = 1
         refreshButton.Text = "🔄"; refreshButton.TextColor3 = Color3.fromRGB(0, 200, 255); refreshButton.TextSize = 14; refreshButton.Font = Enum.Font.SourceSansBold
         
+        local settingsButton = Instance.new("TextButton", playerHeaderFrame)
+        settingsButton.Name = "SettingsButton"
+        settingsButton.Size = UDim2.new(0, 15, 0, 15)
+        settingsButton.Position = UDim2.new(1, -35, 0, 0)
+        settingsButton.BackgroundTransparency = 1
+        settingsButton.Text = "⚙️"
+        settingsButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+        settingsButton.TextSize = 14
+        settingsButton.Font = Enum.Font.SourceSansBold
+
         local isAnimatingRefresh = false
         refreshButton.MouseButton1Click:Connect(function() 
             if isAnimatingRefresh then return end; isAnimatingRefresh = true
@@ -5310,6 +5341,63 @@ task.spawn(function()
         local searchTextBox = Instance.new("TextBox", searchFrame); searchTextBox.Text = ""; searchTextBox.Size = UDim2.new(0.7, -10, 1, 0); searchTextBox.Position = UDim2.new(0, 5, 0, 0); searchTextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); searchTextBox.TextColor3 = Color3.fromRGB(200, 200, 200); searchTextBox.PlaceholderText = "Cari Pemain..."; searchTextBox.TextSize = 12; searchTextBox.Font = Enum.Font.SourceSans; searchTextBox.ClearTextOnFocus = true; local sboxCorner = Instance.new("UICorner", searchTextBox); sboxCorner.CornerRadius = UDim.new(0, 5)
         local searchButton = Instance.new("TextButton", searchFrame); searchButton.Size = UDim2.new(0.3, 0, 1, 0); searchButton.Position = UDim2.new(0.7, 0, 0, 0); searchButton.BackgroundColor3 = Color3.fromRGB(0, 150,  255); searchButton.BorderSizePixel = 0; searchButton.Text = "Cari"; searchButton.TextColor3 = Color3.fromRGB(255, 255, 255); searchButton.TextSize = 12; searchButton.Font = Enum.Font.SourceSansBold; local sbtnCorner = Instance.new("UICorner", searchButton); sbtnCorner.CornerRadius = UDim.new(0, 5)
         
+        local PlayerSettingsFrame = Instance.new("ScrollingFrame", PlayerTabContent)
+        PlayerSettingsFrame.Name = "PlayerSettingsFrame"
+        PlayerSettingsFrame.Size = UDim2.new(1, 0, 1, -55)
+        PlayerSettingsFrame.Position = UDim2.new(0, 0, 0, 55)
+        PlayerSettingsFrame.BackgroundTransparency = 1
+        PlayerSettingsFrame.Visible = false
+        PlayerSettingsFrame.CanvasSize = UDim2.new(0, 0, 0, 0) 
+        PlayerSettingsFrame.ScrollBarThickness = 4
+        PlayerSettingsFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+        PlayerSettingsFrame.ElasticBehavior = Enum.ElasticBehavior.Never
+        PlayerSettingsFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+        PlayerSettingsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+
+        local SettingsListLayout = Instance.new("UIListLayout", PlayerSettingsFrame)
+        SettingsListLayout.Padding = UDim.new(0, 5)
+        setupCanvasSize(SettingsListLayout, PlayerSettingsFrame)
+
+        settingsButton.MouseButton1Click:Connect(function()
+            local isSettingsVisible = not PlayerSettingsFrame.Visible
+            PlayerSettingsFrame.Visible = isSettingsVisible
+            PlayerListContainer.Visible = not isSettingsVisible
+            searchFrame.Visible = not isSettingsVisible
+            if isSettingsVisible then
+                settingsButton.Text = "◀"
+                playerCountLabel.Text = "Pengaturan Player"
+            else
+                settingsButton.Text = "⚙️"
+                playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers()
+            end
+        end)
+
+        -- Populate the settings frame
+        createToggle(PlayerSettingsFrame, "Show Copy Movement Icon 👯", showCopyMovementIcon, function(v) showCopyMovementIcon = v; saveFeatureStates(); updatePlayerList() end)
+        local copyMovementSettingsLabel = Instance.new("TextLabel", PlayerSettingsFrame)
+        copyMovementSettingsLabel.Text = "   Settings mengikuti player 👯"
+        copyMovementSettingsLabel.Size = UDim2.new(1, 0, 0, 20)
+        copyMovementSettingsLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+        copyMovementSettingsLabel.TextXAlignment = Enum.TextXAlignment.Left
+        copyMovementSettingsLabel.Font = Enum.Font.SourceSans
+        copyMovementSettingsLabel.TextSize = 12
+        copyMovementSettingsLabel.BackgroundTransparency = 1
+        createTextBox(PlayerSettingsFrame, "Jeda waktu textbox", copyMovementDelay, function(v) copyMovementDelay = v; saveFeatureStates() end)
+        createToggle(PlayerSettingsFrame, "Bypass animasi on/off", copyMovementBypassAnimation, function(v) copyMovementBypassAnimation = v; saveFeatureStates() end)
+        
+        createToggle(PlayerSettingsFrame, "Show Fling Icon ☠️", showFlingIcon, function(v) showFlingIcon = v; saveFeatureStates(); updatePlayerList() end)
+        local flingSettingsLabel = Instance.new("TextLabel", PlayerSettingsFrame)
+        flingSettingsLabel.Text = "   Settings auto target fling player"
+        flingSettingsLabel.Size = UDim2.new(1, 0, 0, 20)
+        flingSettingsLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+        flingSettingsLabel.TextXAlignment = Enum.TextXAlignment.Left
+        flingSettingsLabel.Font = Enum.Font.SourceSans
+        flingSettingsLabel.TextSize = 12
+        flingSettingsLabel.BackgroundTransparency = 1
+        createToggle(PlayerSettingsFrame, "Invisible fling on/off", flingInvisible, function(v) flingInvisible = v; saveFeatureStates() end)
+
+        createToggle(PlayerSettingsFrame, "Show Teleport Icon 🌀", showTeleportIcon, function(v) showTeleportIcon = v; saveFeatureStates(); updatePlayerList() end)
+
         local function createPlayerButton(player)
             local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.AutomaticSize = Enum.AutomaticSize.Y; playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name; playerFrame.Size = UDim2.new(1,0,0,0);
             local mainLayout = Instance.new("UIListLayout", playerFrame); mainLayout.FillDirection = Enum.FillDirection.Vertical; mainLayout.Padding = UDim.new(0, 2);
