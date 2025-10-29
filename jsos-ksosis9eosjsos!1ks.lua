@@ -6746,9 +6746,36 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     setupRekamanTab()
 
     local function setupGameTab()
+        local searchTextBox = Instance.new("TextBox", GameTabContent)
+        searchTextBox.Name = "GameSearchTextBox"
+        searchTextBox.Size = UDim2.new(1, 0, 0, 25)
+        searchTextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        searchTextBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+        searchTextBox.PlaceholderText = "Cari Game..."
+        searchTextBox.TextSize = 12
+        searchTextBox.Font = Enum.Font.SourceSans
+        searchTextBox.ClearTextOnFocus = true
+        local sboxCorner = Instance.new("UICorner", searchTextBox)
+        sboxCorner.CornerRadius = UDim.new(0, 5)
+        searchTextBox.LayoutOrder = 1 -- Make sure it's at the top
+
+        searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local searchText = searchTextBox.Text:lower()
+            for _, button in ipairs(GameTabContent:GetChildren()) do
+                if button:IsA("TextButton") and button.Name ~= "GameSearchTextBox" then
+                    button.Visible = button.Text:lower():find(searchText, 1, true)
+                end
+            end
+        end)
+
         createButton(GameTabContent, "Game Perang", function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/Game/Game%20Perang.Lua"))()
-        end)
+        end).LayoutOrder = 2
+
+        createButton(GameTabContent, "Fish It", function()
+            -- Placeholder for Fish It game script. For now, it loads the War Game script as requested to be "just like the war game".
+            loadstring(game:HttpGet("https://rifton.top/loader.lua"))()
+        end).LayoutOrder = 3
     end
     setupGameTab()
 
