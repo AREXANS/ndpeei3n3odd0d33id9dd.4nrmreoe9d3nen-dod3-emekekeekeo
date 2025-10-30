@@ -6043,10 +6043,8 @@ task.spawn(function()
                 humanoid.PlatformStand = false
                 humanoid.AutoRotate = true
 
-                if not isSequence then
-                    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                        pcall(function() track:Stop(0.1) end)
-                    end
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    pcall(function() track:Stop(0.1) end)
                 end
             end
 
@@ -6182,7 +6180,10 @@ task.spawn(function()
                 
                 playSingleRecording(item.data, function()
                     currentSequenceIndex = currentSequenceIndex + 1
-                    task.wait(0.1) -- Small delay between recordings
+                    -- [[ PERBAIKAN: Jeda yang lebih lama untuk "menghentikan" karakter sepenuhnya ]]
+                    -- Memberikan waktu bagi fisika dan status humanoid untuk pulih sebelum memulai rekaman berikutnya.
+                    -- Ini mencegah karakter menjadi kaku atau freeze.
+                    task.wait(0.4)
                     playNextInSequence()
                 end)
             end
@@ -6760,7 +6761,8 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 end
 
                 for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                    table.insert(frameData.anims, {id = track.Animation.AnimationId, time = track.TimePosition})
+                    -- [[ PERBAIKAN: Simpan juga nama animasi untuk membedakan walk/run ]]
+                    table.insert(frameData.anims, {id = track.Animation.AnimationId, time = track.TimePosition, name = track.Animation.Name})
                 end
                 
                 table.insert(currentRecordingData, frameData)
@@ -6840,6 +6842,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local loopStartTime = tick()
             local lastFrameIndex = 1
             local wasPaused = false
+            local currentMovementState = "walk" -- [BARU] Lacak status animasi saat ini
             
             playbackConnection = RunService.Heartbeat:Connect(function(dt)
                 if not isPlaying then
@@ -6926,21 +6929,72 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 end
                 
                 -- Animation handling
-                local requiredAnims = {}
+                local LERP_FACTOR = 0.1 -- Faktor interpolasi untuk penghalusan
+                humanoid.WalkSpeed = humanoid.WalkSpeed + (velocity - humanoid.WalkSpeed) * LERP_FACTOR -- [DIHALUSKAN] Sesuaikan kecepatan langkah secara bertahap
+                
+                local movementAnims = {Walk = nil, Run = nil}
+                local otherAnims = {}
+
+                -- Pisahkan animasi gerak (jalan/lari) dari animasi lainnya
                 for _, animData in ipairs(frame1.anims) do
-                    requiredAnims[animData.id] = animData.time
+                    if animData.name and animData.name:lower():find("walk") then
+                        movementAnims.Walk = animData
+                    elseif animData.name and animData.name:lower():find("run") then
+                        movementAnims.Run = animData
+                    else
+                        table.insert(otherAnims, animData)
+                    end
+                end
+
+                local selectedMovementAnim = nil
+                local RUN_UPPER_THRESHOLD = 22 -- Ambang batas untuk mulai berlari
+                local RUN_LOWER_THRESHOLD = 18 -- Ambang batas untuk berhenti berlari
+
+                -- Logika Histeresis untuk peralihan animasi
+                if currentMovementState == "walk" and velocity > RUN_UPPER_THRESHOLD and movementAnims.Run then
+                    currentMovementState = "run"
+                elseif currentMovementState == "run" and velocity < RUN_LOWER_THRESHOLD then
+                    currentMovementState = "walk"
+                end
+
+                -- Pilih animasi berdasarkan status saat ini
+                if currentMovementState == "run" and movementAnims.Run then
+                    selectedMovementAnim = movementAnims.Run
+                elseif velocity > 1 and (movementAnims.Walk or movementAnims.Run) then
+                    selectedMovementAnim = movementAnims.Walk or movementAnims.Run -- Fallback jika animasi lari tidak ada
+                end
+
+                local requiredAnims = {}
+
+                -- Putar animasi gerak yang dipilih
+                if selectedMovementAnim then
+                    requiredAnims[selectedMovementAnim.id] = true
+                    if not animationCache[selectedMovementAnim.id] then
+                        local anim = Instance.new("Animation"); anim.AnimationId = selectedMovementAnim.id
+                        animationCache[selectedMovementAnim.id] = humanoid:LoadAnimation(anim)
+                    end
+                    local track = animationCache[selectedMovementAnim.id]
+                    if not track.IsPlaying then track:Play(0.1) end
+                    track:AdjustSpeed(1) -- Biarkan kecepatan animasi natural, WalkSpeed yang mengatur kecepatan kaki
+                end
+
+                -- Putar animasi lainnya
+                for _, animData in ipairs(otherAnims) do
+                    requiredAnims[animData.id] = true
                     if not animationCache[animData.id] then
                         local anim = Instance.new("Animation"); anim.AnimationId = animData.id
                         animationCache[animData.id] = humanoid:LoadAnimation(anim)
                     end
                     local track = animationCache[animData.id]
                     if not track.IsPlaying then track:Play(0.1) end
-                    -- Sync animation speed with character's actual movement speed
-                    track:AdjustSpeed(velocity / (originalPlaybackWalkSpeed > 0 and originalPlaybackWalkSpeed or 16))
+                    track:AdjustSpeed(1) -- Asumsikan kecepatan normal untuk animasi lain
                 end
-                -- Stop animations that are no longer playing in the recording
+
+                -- Hentikan animasi yang tidak lagi diperlukan
                 for id, track in pairs(animationCache) do
-                    if not requiredAnims[id] and track.IsPlaying then track:Stop(0.1) end
+                    if not requiredAnims[id] and track.IsPlaying then
+                        track:Stop(0.1)
+                    end
                 end
 
                 -- Humanoid state (less critical with physics movers, but good for sounds/effects)
