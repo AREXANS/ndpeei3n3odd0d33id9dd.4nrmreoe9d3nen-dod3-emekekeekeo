@@ -9362,3 +9362,181 @@ TeleportUI:Init(window, CoreModule, PlayerModule, NPCModule, SpotModule, customP
 AutoUI:Init(window, CoreModule, EventsModule, EnchantModule, TradeModule)
 NotificationUI:Init(window, CoreModule, WebhookNotificationModule)
 MiscUI:Init(window, CoreModule, DisableModule)
+
+
+-- ============================
+-- Arexans UI Style Patch
+-- (Appended automatically)
+-- Changes only visual properties (colors, corners, strokes, fonts)
+-- and renames visible title labels to "Fish It By Arexans".
+-- ============================
+
+local function safe_pcall(func, ...)
+    local ok, err = pcall(func, ...)
+    if not ok then
+        -- silently ignore styling errors
+    end
+end
+
+local function ensureUICorner(obj, radius)
+    if not obj then return end
+    local found = false
+    for _,c in ipairs(obj:GetChildren()) do
+        if c:IsA("UICorner") then found = true; break end
+    end
+    if not found then
+        safe_pcall(function()
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, radius or 8)
+            c.Parent = obj
+        end)
+    end
+end
+
+local function ensureUIStroke(obj, color, thickness, transparency)
+    if not obj then return end
+    local found = false
+    for _,c in ipairs(obj:GetChildren()) do
+        if c:IsA("UIStroke") then found = true; break end
+    end
+    if not found then
+        safe_pcall(function()
+            local s = Instance.new("UIStroke")
+            s.Color = color or Color3.fromRGB(0,150,255)
+            s.Thickness = thickness or 1.5
+            s.Transparency = transparency or 0.5
+            s.Parent = obj
+        end)
+    end
+end
+
+local function styleTextObject(obj)
+    if not obj then return end
+    safe_pcall(function()
+        obj.Font = Enum.Font.SourceSansBold
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            obj.TextColor3 = Color3.fromRGB(255,255,255)
+        end
+        -- small titles get smaller size; keep existing sizes otherwise
+        if obj.TextSize == 0 or not obj.TextSize then
+            obj.TextSize = 14
+        end
+    end)
+end
+
+local function applyArexansStyleToScreenGui(screenGui)
+    if not screenGui then return end
+    -- Root frames styling
+    for _, obj in ipairs(screenGui:GetDescendants()) do
+        if obj:IsA("Frame") or obj:IsA("ScrollingFrame") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            -- frames & scrolling frames: dark background with mild transparency
+            if obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
+                safe_pcall(function()
+                    obj.BackgroundColor3 = Color3.fromRGB(20,20,40)
+                    if obj.BackgroundTransparency == 1 then
+                        -- keep fully transparent when explicitly set
+                    else
+                        obj.BackgroundTransparency = 0.3
+                    end
+                end)
+                ensureUICorner(obj, 8)
+                ensureUIStroke(obj, Color3.fromRGB(0,150,255), 1.5, 0.5)
+            else
+                -- Buttons/TextBoxes: use accent background / keep style but ensure readable text
+                safe_pcall(function()
+                    if obj:IsA("TextButton") or obj:IsA("TextBox") then
+                        if obj.BackgroundTransparency == 1 then
+                            -- keep but ensure text color
+                        else
+                            obj.BackgroundColor3 = Color3.fromRGB(0,120,255)
+                            obj.BackgroundTransparency = 0.15
+                        end
+                    end
+                end)
+                ensureUICorner(obj, 6)
+            end
+            styleTextObject(obj)
+        end
+
+        if obj:IsA("TextLabel") then
+            safe_pcall(function()
+                -- small informational labels use subtle gray
+                if obj.TextSize and obj.TextSize <= 12 then
+                    obj.TextColor3 = Color3.fromRGB(200,200,200)
+                else
+                    obj.TextColor3 = Color3.fromRGB(255,255,255)
+                end
+                obj.Font = Enum.Font.SourceSansBold
+            end)
+        end
+
+        if obj:IsA("ScrollingFrame") then
+            safe_pcall(function()
+                obj.ScrollBarImageColor3 = Color3.fromRGB(0,150,255)
+            end)
+        end
+    end
+
+    -- rename title-like labels that mention fish/farm into the required title
+    for _, obj in ipairs(screenGui:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            local text = tostring(obj.Text or ""):lower()
+            if text:find("fish") or text:find("fishing") or text:find("farm") then
+                safe_pcall(function()
+                    obj.Text = "Fish It By Arexans"
+                    obj.TextColor3 = Color3.fromRGB(0,170,255)
+                    obj.TextXAlignment = Enum.TextXAlignment.Center
+                end)
+            end
+        end
+    end
+end
+
+-- Delay slightly to allow the original UI to be created
+task.spawn(function()
+    task.wait(1) -- wait 1 second (non-blocking for script)
+    local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local guiRoots = {}
+
+    -- candidate roots: CoreGui children and PlayerGui
+    for _, child in ipairs(CoreGui:GetChildren()) do
+        if child:IsA("ScreenGui") then
+            table.insert(guiRoots, child)
+        end
+    end
+    if LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") then
+        for _, child in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if child:IsA("ScreenGui") then
+                table.insert(guiRoots, child)
+            end
+        end
+    end
+
+    -- apply heuristics to decide which ScreenGuis belong to this script:
+    for _, sg in ipairs(guiRoots) do
+        local shouldStyle = false
+        local nameLower = tostring(sg.Name or ""):lower()
+        if nameLower:find("fish") or nameLower:find("farm") or nameLower:find("fishing") or nameLower:find("fishit") then
+            shouldStyle = true
+        else
+            -- scan descendants for recognizable keywords used in the original UI
+            for _, d in ipairs(sg:GetDescendants()) do
+                if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                    local txt = tostring(d.Text or ""):lower()
+                    if txt:find("auto fishing") or txt:find("auto fishing") or txt:find("sell all fish") or txt:find("favorite") or txt:find("fishing") then
+                        shouldStyle = true
+                        break
+                    end
+                end
+            end
+        end
+
+        if shouldStyle then
+            applyArexansStyleToScreenGui(sg)
+        end
+    end
+end)
+
+-- End of Arexans UI Patch
