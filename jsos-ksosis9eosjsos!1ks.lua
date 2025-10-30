@@ -7116,7 +7116,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
 
         createButton(GameTabContent, "Fish It", function()
             -- Placeholder for Fish It game script. For now, it loads the War Game script as requested to be "just like the war game".
-            loadstring(game:HttpGet("https://rifton.top/loader.lua"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/Game/fish%20it.lua"))()
         end).LayoutOrder = 3
     end
     setupGameTab()
