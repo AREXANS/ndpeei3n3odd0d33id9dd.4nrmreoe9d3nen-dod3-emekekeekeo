@@ -6222,10 +6222,10 @@ task.spawn(function()
     
         -- Tombol bawah (Pangkas, Impor, Rekam, Gabung, Ekspor) - URUTAN DIUBAH
         local trimButton = createIconButton(controlButtonsFrame, "✂️", Color3.fromRGB(200, 150, 50), 22)
-        local joinButton = createIconButton(controlButtonsFrame, "🔗", Color3.fromRGB(100, 200, 100), 22)
+        local exportButton = createIconButton(controlButtonsFrame, "📤", Color3.fromRGB(50, 150, 200), 22)
         recordButton = createIconButton(controlButtonsFrame, "🔴", Color3.fromRGB(200, 50, 50), 22)
         local importButton = createIconButton(controlButtonsFrame, "📥", Color3.fromRGB(50, 150, 200), 22)
-        local exportButton = createIconButton(controlButtonsFrame, "📤", Color3.fromRGB(50, 150, 200), 22)
+        local joinButton = createIconButton(controlButtonsFrame, "🔗", Color3.fromRGB(100, 200, 100), 22)
 
         -- Frame baru untuk tombol atas (Putar, Pilih Semua)
         -- Frame baru untuk tombol atas (Putar, Pilih Semua)
