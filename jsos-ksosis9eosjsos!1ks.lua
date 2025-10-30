@@ -1157,10 +1157,13 @@ task.spawn(function()
     local saveGuiPositions -- Deklarasi awal
     
     local function naturalCompare(a, b)
+        local nameA = type(a) == "table" and a.Name or a or ""
+        local nameB = type(b) == "table" and b.Name or b or ""
+
         local function split(s)
             local parts = {}; for text, number in s:gmatch("([^%d]*)(%d*)") do if text ~= "" then table.insert(parts, text:lower()) end; if number ~= "" then table.insert(parts, tonumber(number)) end end; return parts
         end
-        local partsA = split(a.Name or ""); local partsB = split(b.Name or ""); for i = 1, math.min(#partsA, #partsB) do local partA = partsA[i]; local partB = partsB[i]; if type(partA) ~= type(partB) then return type(partA) == "number" end; if partA < partB then return true elseif partA > partB then return false end end; return #partsA < #partsB
+        local partsA = split(nameA); local partsB = split(nameB); for i = 1, math.min(#partsA, #partsB) do local partA = partsA[i]; local partB = partsB[i]; if type(partA) ~= type(partB) then return type(partA) == "number" end; if partA < partB then return true elseif partA > partB then return false end end; return #partsA < #partsB
     end
     
     local updateTeleportList, updateRecordingsList
@@ -5674,60 +5677,133 @@ task.spawn(function()
     
     
     setupTeleportTab = function()
-        createButton(TeleportTabContent, "Pindai Ulang Map", function() for _, part in pairs(Workspace:GetDescendants()) do if part:IsA("BasePart") then local nameLower = part.Name:lower(); if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start")) and not Players:GetPlayerFromCharacter(part.Parent) then addTeleportLocation(part.Name, part.CFrame) end end end end).LayoutOrder = 1
-        createButton(TeleportTabContent, "Simpan Lokasi Saat Ini", function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then local newName = "Kustom " .. (#savedTeleportLocations + 1); addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame) end end).LayoutOrder = 2
+        -- [[ PERUBAHAN BESAR: Desain Ulang UI Teleport ke Dua Baris ]]
         
-        local importExportFrame = Instance.new("Frame", TeleportTabContent)
-        importExportFrame.Size = UDim2.new(1, 0, 0, 25)
-        importExportFrame.BackgroundTransparency = 1
-        importExportFrame.LayoutOrder = 3
-        local ieLayout = Instance.new("UIListLayout", importExportFrame)
-        ieLayout.FillDirection = Enum.FillDirection.Horizontal
-        ieLayout.Padding = UDim.new(0, 5)
+        -- Wadah utama untuk semua kontrol toolbar
+        local mainToolbarContainer = Instance.new("Frame", TeleportTabContent)
+        mainToolbarContainer.Name = "TeleportToolbarContainer"
+        mainToolbarContainer.Size = UDim2.new(1, 0, 0, 60) -- Cukup tinggi untuk dua baris
+        mainToolbarContainer.BackgroundTransparency = 1
+        mainToolbarContainer.LayoutOrder = 1
+
+        local mainToolbarLayout = Instance.new("UIListLayout", mainToolbarContainer)
+        mainToolbarLayout.FillDirection = Enum.FillDirection.Vertical
+        mainToolbarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        mainToolbarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+        mainToolbarLayout.Padding = UDim.new(0, 4)
+
+        -- Baris Pertama: Tombol [Impor] [Simpan] [Ekspor]
+        local row1Frame = Instance.new("Frame", mainToolbarContainer)
+        row1Frame.Name = "ToolbarRow1"
+        row1Frame.Size = UDim2.new(1, 0, 0, 28)
+        row1Frame.BackgroundTransparency = 1
         
-        local exportButton = createButton(importExportFrame, "Ekspor", function() 
-            if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
-            local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
-            local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
-            if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end 
-        end)
-        exportButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-        
-        local importButton = createButton(importExportFrame, "Impor", function() 
-            showImportPrompt(function(text) 
+        local row1Layout = Instance.new("UIListLayout", row1Frame)
+        row1Layout.FillDirection = Enum.FillDirection.Horizontal
+        row1Layout.VerticalAlignment = Enum.VerticalAlignment.Center
+        row1Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Pusatkan item di baris ini
+        row1Layout.Padding = UDim.new(0, 20) -- Beri jarak antar tombol
+
+        -- Baris Kedua: [Textbox Radius] [Tombol Scan]
+        local row2Frame = Instance.new("Frame", mainToolbarContainer)
+        row2Frame.Name = "ToolbarRow2"
+        row2Frame.Size = UDim2.new(1, 0, 0, 28)
+        row2Frame.BackgroundTransparency = 1
+
+        local row2Layout = Instance.new("UIListLayout", row2Frame)
+        row2Layout.FillDirection = Enum.FillDirection.Horizontal
+        row2Layout.VerticalAlignment = Enum.VerticalAlignment.Center
+        row2Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Pusatkan item di baris ini juga
+        row2Layout.Padding = UDim.new(0, 5)
+
+        -- Membuat tombol dan input, lalu memasukkannya ke frame baris yang benar
+
+        local importButton = createButton(row1Frame, "📥", function()
+            showImportPrompt(function(text)
                 if not text or text == "" then return end
                 local success, decodedData = pcall(HttpService.JSONDecode, HttpService, text)
                 if not success or type(decodedData) ~= "table" then showNotification("Data impor tidak valid!", Color3.fromRGB(200, 50, 50)); return end
                 local existingNames = {}; for _, loc in ipairs(savedTeleportLocations) do existingNames[loc.Name] = true end
                 local importedCount = 0
-                for _, data in ipairs(decodedData) do 
-                    if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then 
+                for _, data in ipairs(decodedData) do
+                    if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then
                         local cframe = CFrame.new(unpack(data.CFrameData))
                         table.insert(savedTeleportLocations, { Name = data.Name, CFrame = cframe })
                         existingNames[data.Name] = true
-                        importedCount = importedCount + 1 
-                    end 
+                        importedCount = importedCount + 1
+                    end
                 end
-                if importedCount > 0 then 
-                    table.sort(savedTeleportLocations, naturalCompare)
-                    saveTeleportData()
-                    updateTeleportList()
-                    showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50)) 
-                else 
-                    showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50)) 
-                end 
-            end) 
+                if importedCount > 0 then
+                    table.sort(savedTeleportLocations, naturalCompare); saveTeleportData(); updateTeleportList()
+                    showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50))
+                else
+                    showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50))
+                end
+            end)
         end)
-        importButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-        
+        importButton.Size = UDim2.new(0, 24, 0, 24)
+        importButton.TextSize = 14
+        importButton.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+
+        local saveButton = createButton(row1Frame, "📍", function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local newName = "Kustom " .. (#savedTeleportLocations + 1)
+                addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame)
+                showNotification("Lokasi disimpan: " .. newName, Color3.fromRGB(50, 150, 255))
+            end
+        end)
+        saveButton.Size = UDim2.new(0, 24, 0, 24)
+        saveButton.TextSize = 14
+        saveButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+
+        local exportButton = createButton(row1Frame, "📤", function()
+            if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
+            local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
+            local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
+            if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end
+        end)
+        exportButton.Size = UDim2.new(0, 24, 0, 24)
+        exportButton.TextSize = 14
+        exportButton.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+
+        local radiusTextBox = Instance.new("TextBox", row2Frame)
+        radiusTextBox.Size = UDim2.new(0, 80, 0, 24)
+        radiusTextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        radiusTextBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+        radiusTextBox.Text = "999999"; radiusTextBox.Font = Enum.Font.SourceSans
+        radiusTextBox.TextSize = 12; radiusTextBox.ClearTextOnFocus = false
+        radiusTextBox.TextXAlignment = Enum.TextXAlignment.Center
+        local radCorner = Instance.new("UICorner", radiusTextBox); radCorner.CornerRadius = UDim.new(0, 4)
+        radiusTextBox:GetPropertyChangedSignal("Text"):Connect(function() radiusTextBox.Text = radiusTextBox.Text:gsub("%D", "") end)
+
+        local scanButton = createButton(row2Frame, "📡", function()
+            local radius = tonumber(radiusTextBox.Text) or 999999
+            local playerPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+            if not playerPos then showNotification("Karakter tidak ditemukan.", Color3.fromRGB(200, 50, 50)); return end
+            
+            showNotification("Memindai area radius " .. radius .. "m...", Color3.fromRGB(150, 150, 255))
+            local foundCount = 0
+            for _, part in pairs(Workspace:GetDescendants()) do
+                if part:IsA("BasePart") and (part.Position - playerPos).Magnitude <= radius then
+                    local nameLower = part.Name:lower()
+                    if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start") or nameLower:find("spawn")) and not Players:GetPlayerFromCharacter(part.Parent) then
+                        addTeleportLocation(part.Name, part.CFrame)
+                        foundCount = foundCount + 1
+                    end
+                end
+            end
+            showNotification("Pindai selesai: " .. foundCount .. " lokasi ditemukan & disimpan.", Color3.fromRGB(50, 200, 50))
+        end)
+        scanButton.Size = UDim2.new(0, 24, 0, 24)
+        scanButton.TextSize = 14
+
         createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
             areTeleportIconsVisible = v
             updateTeleportIconVisibility()
-        end).LayoutOrder = 4
+        end).LayoutOrder = 2
 
-        -- FITUR BARU: AUTO LOOPING TELEPORT DENGAN UI KOMPAK
         local autoLoopSettingsFrame = Instance.new("Frame", TeleportTabContent)
-        autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 6
+        autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 4
         local settingsLayout = Instance.new("UIListLayout", autoLoopSettingsFrame); settingsLayout.FillDirection, settingsLayout.VerticalAlignment, settingsLayout.Padding = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center, UDim.new(0, 5)
 
         local function createCompactInput(parent, label, default)
@@ -5743,24 +5819,22 @@ task.spawn(function()
         local playStopButton = createButton(autoLoopSettingsFrame, "▶️", function() end)
         playStopButton.Size, playStopButton.BackgroundColor3 = UDim2.new(0.2, 0, 0, 22), Color3.fromRGB(50, 180, 50)
 
-        createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 5
+        createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 3
 
         playStopButton.MouseButton1Click:Connect(function()
             if not hasPermission("Normal") then
                 showNotification("Tingkatkan ke Normal/VIP untuk menggunakan fitur ini.", Color3.fromRGB(255,100,0))
                 return
             end
-            if isAutoLooping then -- Tombol Stop ditekan
+            if isAutoLooping then
                 isAutoLooping = false
                 playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
-            else -- Tombol Play ditekan
+            else
                 local repetitions, delayTime = tonumber(repeatInput.Text), tonumber(delayInput.Text)
                 if not repetitions or repetitions <= 0 or not delayTime or delayTime < 0 then showNotification("Input jumlah & delay tidak valid.", Color3.fromRGB(200, 50, 50)); return end
                 if #savedTeleportLocations == 0 then showNotification("Tidak ada lokasi teleport.", Color3.fromRGB(200, 50, 50)); return end
-                
                 isAutoLooping = true
                 playStopButton.Text, playStopButton.BackgroundColor3 = "⏹️", Color3.fromRGB(200, 50, 50)
-                
                 task.spawn(function()
                     for i = 1, repetitions do
                         if not isAutoLooping then break end
@@ -5841,7 +5915,7 @@ task.spawn(function()
         local recListLayout = Instance.new("UIListLayout", recordingsListFrame)
         recListLayout.Padding = UDim.new(0, 5)
         recListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        recListLayout.SortOrder = Enum.SortOrder.Name
+        -- recListLayout.SortOrder = Enum.SortOrder.Name -- Dihapus agar bisa diurutkan secara manual
         local recListPadding = Instance.new("UIPadding", recordingsListFrame)
         recListPadding.PaddingTop = UDim.new(0, 5)
         recListPadding.PaddingBottom = UDim.new(0, 5)
@@ -5877,13 +5951,26 @@ task.spawn(function()
         
             local sortedNames = {}
             for name in pairs(savedRecordings) do table.insert(sortedNames, name) end
-            table.sort(sortedNames)
+            table.sort(sortedNames, naturalCompare)
         
-            for _, recName in ipairs(sortedNames) do
+            -- Hapus properti SortOrder dari UIListLayout
+            local recListLayout = recordingsListFrame:FindFirstChildOfClass("UIListLayout")
+            if recListLayout then
+                recListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Set ke manual order
+            end
+        
+            for i, recName in ipairs(sortedNames) do
                 local isSelected = selectedRecordings[recName] or false
 
                 local itemFrame = Instance.new("Frame")
-                itemFrame.Name = recName; itemFrame.Size = UDim2.new(1, 0, 0, 22); itemFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35); itemFrame.BackgroundTransparency = isSelected and 0 or 0.3; itemFrame.BorderSizePixel = 0; itemFrame.Parent = recordingsListFrame
+                itemFrame.Name = recName; 
+                itemFrame.LayoutOrder = i -- Set manual layout order
+                itemFrame.Size = UDim2.new(1, 0, 0, 22); 
+                itemFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35); 
+                itemFrame.BackgroundTransparency = isSelected and 0 or 0.3; 
+                itemFrame.BorderSizePixel = 0; 
+                itemFrame.Parent = recordingsListFrame
+                
                 local itemCorner = Instance.new("UICorner", itemFrame); itemCorner.CornerRadius = UDim.new(0, 4)
                 local itemLayout = Instance.new("UIListLayout", itemFrame); itemLayout.FillDirection = Enum.FillDirection.Horizontal; itemLayout.VerticalAlignment = Enum.VerticalAlignment.Center; itemLayout.Padding = UDim.new(0, 5)
                 local itemPadding = Instance.new("UIPadding", itemFrame); itemPadding.PaddingLeft = UDim.new(0, 5)
@@ -6132,9 +6219,11 @@ task.spawn(function()
             return btn
         end
     
-        -- Tombol bawah (Impor, Rekam, Ekspor)
-        local importButton = createIconButton(controlButtonsFrame, "📥", Color3.fromRGB(50, 150, 200), 22)
+        -- Tombol bawah (Pangkas, Impor, Rekam, Gabung, Ekspor) - URUTAN DIUBAH
+        local trimButton = createIconButton(controlButtonsFrame, "✂️", Color3.fromRGB(200, 150, 50), 22)
+        local joinButton = createIconButton(controlButtonsFrame, "🔗", Color3.fromRGB(100, 200, 100), 22)
         recordButton = createIconButton(controlButtonsFrame, "🔴", Color3.fromRGB(200, 50, 50), 22)
+        local importButton = createIconButton(controlButtonsFrame, "📥", Color3.fromRGB(50, 150, 200), 22)
         local exportButton = createIconButton(controlButtonsFrame, "📤", Color3.fromRGB(50, 150, 200), 22)
 
         -- Frame baru untuk tombol atas (Putar, Pilih Semua)
@@ -6195,6 +6284,344 @@ task.spawn(function()
                     showNotification("Tidak ada rekaman baru untuk diimpor.", Color3.fromRGB(200, 150, 50))
                 end
             end)
+        end)
+
+        local function showTrimPrompt(recordingName, recordingData, callback)
+            local coreGuiParent = game:GetService("CoreGui")
+            if coreGuiParent:FindFirstChild("TrimPromptGUI") then
+                coreGuiParent:FindFirstChild("TrimPromptGUI"):Destroy()
+            end
+        
+            local ScreenGui = Instance.new("ScreenGui", coreGuiParent)
+            ScreenGui.Name = "TrimPromptGUI"
+            ScreenGui.DisplayOrder = 25
+            ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        
+            local Frame = Instance.new("Frame", ScreenGui)
+            Frame.Size = UDim2.new(0, 220, 0, 115) -- Dikecilkan
+            Frame.Position = UDim2.new(0.5, -110, 0.5, -57) -- Disesuaikan
+            Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+            Frame.BackgroundTransparency = 0.2
+            local corner = Instance.new("UICorner", Frame); corner.CornerRadius = UDim.new(0, 6)
+            local stroke = Instance.new("UIStroke", Frame); stroke.Color = Color3.fromRGB(200, 150, 50); stroke.Thickness = 1
+        
+            local TitleLabel = Instance.new("TextLabel", Frame)
+            TitleLabel.Size = UDim2.new(1, -30, 0, 20)
+            TitleLabel.Position = UDim2.new(0, 10, 0, 2)
+            TitleLabel.Text = "Pangkas: " .. recordingName
+            TitleLabel.TextColor3 = Color3.new(1,1,1)
+            TitleLabel.BackgroundTransparency = 1
+            TitleLabel.Font = Enum.Font.SourceSansBold
+            TitleLabel.TextSize = 11
+            TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        
+            local isPreviewing = false
+            local originalIsPlaying = isPlaying
+            
+            local CloseButton = Instance.new("TextButton", Frame)
+            CloseButton.Size = UDim2.new(0, 20, 0, 20); CloseButton.Position = UDim2.new(1, -25, 0, 2)
+            CloseButton.BackgroundTransparency = 1; CloseButton.Font = Enum.Font.SourceSansBold
+            CloseButton.Text = "X"; CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CloseButton.TextSize = 16
+            CloseButton.MouseButton1Click:Connect(function()
+                if isPreviewing then 
+                    stopPlayback() 
+                    isPlaying = originalIsPlaying
+                end
+                ScreenGui:Destroy()
+            end)
+            
+            local duration = recordingData.frames[#recordingData.frames].time
+            local startTimeValue, endTimeValue = 0, duration
+        
+            local function formatTime(s) return string.format("%02d:%02.1f", math.floor(s/60), s % 60) end
+        
+            local startLabel = Instance.new("TextLabel", Frame)
+            startLabel.Size = UDim2.new(0.5, -10, 0, 15); startLabel.Position = UDim2.new(0, 10, 0, 24)
+            startLabel.BackgroundTransparency = 1; startLabel.Font = Enum.Font.SourceSans
+            startLabel.TextColor3 = Color3.fromRGB(200, 200, 200); startLabel.TextSize = 10
+            startLabel.TextXAlignment = Enum.TextXAlignment.Left
+        
+            local endLabel = Instance.new("TextLabel", Frame)
+            endLabel.Size = UDim2.new(0.5, -10, 0, 15); endLabel.Position = UDim2.new(0.5, 0, 0, 24)
+            endLabel.BackgroundTransparency = 1; endLabel.Font = Enum.Font.SourceSans
+            endLabel.TextColor3 = Color3.fromRGB(200, 200, 200); endLabel.TextSize = 10
+            endLabel.TextXAlignment = Enum.TextXAlignment.Right
+            
+            local function updateLabels()
+                startLabel.Text = "Mulai: " .. formatTime(startTimeValue)
+                endLabel.Text = "Selesai: " .. formatTime(endTimeValue)
+            end
+        
+            local sliderContainer = Instance.new("Frame", Frame)
+            sliderContainer.Size = UDim2.new(1, -20, 0, 30)
+            sliderContainer.Position = UDim2.new(0, 10, 0, 42)
+            sliderContainer.BackgroundTransparency = 1
+        
+            local track = Instance.new("Frame", sliderContainer)
+            track.Size = UDim2.new(1, 0, 0, 10); track.Position = UDim2.new(0, 0, 0.5, -5)
+            track.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+            local trackCorner = Instance.new("UICorner", track); trackCorner.CornerRadius = UDim.new(1, 0)
+        
+            local fill = Instance.new("Frame", track)
+            fill.Size = UDim2.new(1, 0, 1, 0)
+            fill.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+            local fillCorner = Instance.new("UICorner", fill); fillCorner.CornerRadius = UDim.new(1, 0)
+        
+            local startThumb = Instance.new("TextButton", sliderContainer)
+            startThumb.Size = UDim2.new(0, 18, 0, 28); startThumb.Position = UDim2.new(0, -9, 0.5, -14)
+            startThumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+            startThumb.Text = ""
+            local stCorner = Instance.new("UICorner", startThumb); stCorner.CornerRadius = UDim.new(0, 3)
+        
+            local endThumb = Instance.new("TextButton", sliderContainer)
+            endThumb.Size = UDim2.new(0, 18, 0, 28); endThumb.Position = UDim2.new(1, -9, 0.5, -14)
+            endThumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+            endThumb.Text = ""
+            endThumb.ZIndex = 2
+            local etCorner = Instance.new("UICorner", endThumb); etCorner.CornerRadius = UDim.new(0, 3)
+        
+            local startThumbHitbox = Instance.new("TextButton", sliderContainer)
+            startThumbHitbox.Size = UDim2.new(0, 30, 0, 30)
+            startThumbHitbox.BackgroundTransparency = 1
+            startThumbHitbox.Text = ""
+            startThumbHitbox.ZIndex = 3
+
+            local endThumbHitbox = Instance.new("TextButton", sliderContainer)
+            endThumbHitbox.Size = UDim2.new(0, 30, 0, 30)
+            endThumbHitbox.BackgroundTransparency = 1
+            endThumbHitbox.Text = ""
+            endThumbHitbox.ZIndex = 3
+        
+            local function updateThumbsAndFill()
+                local startX = startTimeValue / duration
+                local endX = endTimeValue / duration
+                startThumb.Position = UDim2.new(startX, -9, 0.5, -14)
+                endThumb.Position = UDim2.new(endX, -9, 0.5, -14)
+                startThumbHitbox.Position = UDim2.new(startX, -15, 0.5, -15)
+                endThumbHitbox.Position = UDim2.new(endX, -15, 0.5, -15)
+                fill.Position = UDim2.new(startX, 0, 0, 0)
+                fill.Size = UDim2.new(endX - startX, 0, 1, 0)
+                updateLabels()
+            end
+        
+            local function makeDraggable(hitbox, isStartThumb)
+                local dragging = false
+                hitbox.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true end end)
+                hitbox.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local newX = input.Position.X - track.AbsolutePosition.X
+                        local percent = math.clamp(newX / track.AbsoluteSize.X, 0, 1)
+                        local newValue = percent * duration
+                        if isStartThumb then startTimeValue = math.min(newValue, endTimeValue - 0.1) else endTimeValue = math.max(newValue, startTimeValue + 0.1) end
+                        updateThumbsAndFill()
+                    end
+                end)
+            end
+        
+            makeDraggable(startThumbHitbox, true)
+            makeDraggable(endThumbHitbox, false)
+            
+            local bottomControls = Instance.new("Frame", Frame)
+            bottomControls.Size = UDim2.new(1, -20, 0, 25)
+            bottomControls.Position = UDim2.new(0, 10, 1, -30)
+            bottomControls.BackgroundTransparency = 1
+            
+            local bottomLayout = Instance.new("UIListLayout", bottomControls)
+            bottomLayout.FillDirection = Enum.FillDirection.Horizontal
+            bottomLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            bottomLayout.Padding = UDim.new(0, 5)
+
+            local nameLabel = Instance.new("TextLabel", bottomControls)
+            nameLabel.Name = "NameLabel"
+            nameLabel.LayoutOrder = 1
+            nameLabel.Size = UDim2.new(0, 35, 0, 22)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Font = Enum.Font.SourceSans
+            nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+            nameLabel.TextSize = 11
+            nameLabel.Text = "Nama:"
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Right
+            nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+            local nameTextBox = Instance.new("TextBox", bottomControls)
+            nameTextBox.Name = "NameTextBox"
+            nameTextBox.LayoutOrder = 2
+            nameTextBox.Size = UDim2.new(0, 94, 0, 22)
+            nameTextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            nameTextBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+            nameTextBox.Text = recordingName .. "_p"
+            nameTextBox.Font = Enum.Font.SourceSans
+            nameTextBox.TextSize = 11
+            nameTextBox.ClearTextOnFocus = false
+            local tbCorner = Instance.new("UICorner", nameTextBox); tbCorner.CornerRadius = UDim.new(0, 4)
+            local tbPadding = Instance.new("UIPadding", nameTextBox); tbPadding.PaddingLeft = UDim.new(0, 4)
+        
+            local previewButton = createButton(bottomControls, "▶️", function() end)
+            previewButton.LayoutOrder = 3
+            previewButton.Size = UDim2.new(0, 28, 0, 22)
+            previewButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+
+            previewButton.MouseButton1Click:Connect(function()
+                if isPreviewing then
+                    stopPlayback()
+                    isPreviewing = false
+                    previewButton.Text = "▶️"
+                    isPlaying = originalIsPlaying
+                else
+                    isPreviewing = true
+                    previewButton.Text = "⏹️"
+                    local trimmedData = {frames = {}}
+                    local timeOffset = -1
+                    for _, frame in ipairs(recordingData.frames) do
+                        if frame.time >= startTimeValue and frame.time <= endTimeValue then
+                            if timeOffset < 0 then timeOffset = frame.time end
+                            local newFrame = table.clone(frame); newFrame.time = newFrame.time - timeOffset; table.insert(trimmedData.frames, newFrame)
+                        end
+                    end
+                    if #trimmedData.frames > 1 then
+                        local char = LocalPlayer.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if hrp then hrp.CFrame = CFrame.new(unpack(trimmedData.frames[1].cframe)); task.wait(0.5) end
+                        isPlaying = true
+                        playSingleRecording(trimmedData, function() task.wait(0.5); isPreviewing = false; previewButton.Text = "▶️"; isPlaying = originalIsPlaying end)
+                    else
+                        showNotification("Segmen terlalu pendek untuk pratinjau.", Color3.fromRGB(200,150,50)); isPreviewing = false; previewButton.Text = "▶️"
+                    end
+                end
+            end)
+
+            local saveButton = createButton(bottomControls, "💾", function()
+                if isPreviewing then stopPlayback() end
+                
+                local baseName = nameTextBox.Text
+                if not baseName or baseName == "" then
+                    showNotification("Nama tidak boleh kosong!", Color3.fromRGB(200,50,50))
+                    return
+                end
+                
+                local newName = baseName
+                local counter = 2
+                while savedRecordings[newName] do
+                    newName = baseName .. " " .. counter
+                    counter = counter + 1
+                end
+                
+                callback(newName, startTimeValue, endTimeValue)
+                ScreenGui:Destroy()
+            end)
+            saveButton.LayoutOrder = 4
+            saveButton.Size = UDim2.new(0, 28, 0, 22)
+        
+            updateLabels()
+            updateThumbsAndFill()
+        end
+
+        trimButton.MouseButton1Click:Connect(function()
+            local selectedCount = 0
+            local selectedName
+            for name, isSelected in pairs(selectedRecordings) do
+                if isSelected then
+                    selectedCount = selectedCount + 1
+                    selectedName = name
+                end
+            end
+
+            if selectedCount ~= 1 then
+                showNotification("Pilih satu rekaman untuk dipangkas.", Color3.fromRGB(200, 150, 50))
+                return
+            end
+
+            local recordingData = savedRecordings[selectedName]
+            if not recordingData or not recordingData.frames or #recordingData.frames < 2 then
+                 showNotification("Rekaman tidak valid atau terlalu singkat.", Color3.fromRGB(200, 50, 50))
+                return
+            end
+
+            showTrimPrompt(selectedName, recordingData, function(newName, startTime, endTime)
+                local originalFrames = recordingData.frames
+                local newFrames = {}
+                local timeOffset = -1
+
+                for _, frame in ipairs(originalFrames) do
+                    if frame.time >= startTime and frame.time <= endTime then
+                        if timeOffset < 0 then
+                            timeOffset = frame.time
+                        end
+                        local newFrame = table.clone(frame)
+                        newFrame.time = frame.time - timeOffset
+                        table.insert(newFrames, newFrame)
+                    end
+                end
+
+                if #newFrames > 1 then
+                    local newRecordingObject = {
+                        frames = newFrames,
+                        targetUserId = recordingData.targetUserId
+                    }
+                    savedRecordings[newName] = newRecordingObject
+                    saveRecordingsData()
+                    updateRecordingsList()
+                    showNotification("Rekaman dipangkas dan disimpan sebagai '"..newName.."'", Color3.fromRGB(50, 200, 50))
+                else
+                    showNotification("Hasil pangkas terlalu singkat untuk disimpan.", Color3.fromRGB(200, 150, 50))
+                end
+            end)
+        end)
+
+        joinButton.MouseButton1Click:Connect(function()
+            local recordingsToJoin = {}
+            local sortedNames = {}
+            for name in pairs(savedRecordings) do table.insert(sortedNames, name) end
+            table.sort(sortedNames)
+
+            for _, name in ipairs(sortedNames) do
+                if selectedRecordings[name] then
+                    table.insert(recordingsToJoin, {name = name, data = savedRecordings[name]})
+                end
+            end
+
+            if #recordingsToJoin < 2 then
+                showNotification("Pilih dua atau lebih rekaman untuk disambung.", Color3.fromRGB(200, 150, 50))
+                return
+            end
+
+            local newName = promptInput("Masukkan nama untuk rekaman gabungan:")
+            if not newName or newName == "" then
+                showNotification("Nama tidak boleh kosong.", Color3.fromRGB(200, 50, 50))
+                return
+            end
+            if savedRecordings[newName] then
+                showNotification("Nama rekaman sudah ada.", Color3.fromRGB(200, 50, 50))
+                return
+            end
+
+            local combinedFrames = {}
+            local totalDuration = 0
+            local firstTargetId = recordingsToJoin[1].data.targetUserId
+
+            for i, recInfo in ipairs(recordingsToJoin) do
+                if recInfo.data.targetUserId ~= firstTargetId then
+                    showNotification("Rekaman hanya bisa digabung jika targetnya sama.", Color3.fromRGB(200, 50, 50))
+                    return
+                end
+
+                for _, frame in ipairs(recInfo.data.frames) do
+                    local newFrame = table.clone(frame)
+                    newFrame.time = newFrame.time + totalDuration
+                    table.insert(combinedFrames, newFrame)
+                end
+                totalDuration = totalDuration + recInfo.data.frames[#recInfo.data.frames].time
+            end
+
+            local newRecordingObject = {
+                frames = combinedFrames,
+                targetUserId = firstTargetId
+            }
+
+            savedRecordings[newName] = newRecordingObject
+            saveRecordingsData()
+            updateRecordingsList()
+            showNotification("Rekaman berhasil digabung menjadi '"..newName.."'", Color3.fromRGB(50, 200, 50))
         end)
 
         selectAllButton.MouseButton1Click:Connect(function()
@@ -6387,13 +6814,9 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local humanoid = char and char:FindFirstChildOfClass("Humanoid")
             if not (hrp and humanoid) then if onComplete then onComplete() end; return end
         
+            humanoid.AutoRotate = false -- [[ FIX: Pastikan kontrol fisika mengambil alih sepenuhnya ]]
             originalPlaybackWalkSpeed = humanoid.WalkSpeed
-            IsPlaybackActive = true
             local animateScript = char and char:FindFirstChild("Animate")
-            if animateScript then
-                savedAnimateDisabled = animateScript.Disabled
-                pcall(function() animateScript.Disabled = false end)
-            end
         
             local recordingData = recordingObject.frames or recordingObject
             if not recordingData or #recordingData < 1 then if onComplete then onComplete() end; return end
@@ -6404,42 +6827,21 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local animationCache = {}
             playbackMovers = {}
         
+            -- Setup Movers for Physics-based movement
             pcall(function()
-                local responsivenessValue = isAnimationBypassEnabled and 35 or 200
                 local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
-                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = responsivenessValue; alignPos.MaxForce = 100000
-                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 100000
+                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = 200; alignPos.MaxForce = 9e9
+                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 9e9
                 playbackMovers.attachment = attachment
                 playbackMovers.alignPos = alignPos
                 playbackMovers.alignOrient = alignOrient
             end)
         
-            if isAnimationBypassEnabled then
-                pcall(function()
-                    local guidePart = Instance.new("Part"); guidePart.Name = "PlaybackGuidePart"; guidePart.Size = Vector3.new(1,1,1); guidePart.Transparency = 1; guidePart.CanCollide = false; guidePart.Anchored = true; guidePart.Parent = workspace
-                    playbackMovers.guidePart = guidePart
-                end)
-            end
-        
-            local soundJumping, soundLanding, customRunningSound
-            pcall(function()
-                soundJumping = hrp:FindFirstChild("Jumping")
-                soundLanding = hrp:FindFirstChild("FreeFalling")
-                customRunningSound = Instance.new("Sound", hrp); customRunningSound.Name = "CustomRunningSound"; customRunningSound.Looped = true
-                local originalRunningSound = hrp:FindFirstChild("Running")
-                if originalRunningSound and originalRunningSound:IsA("Sound") then
-                    customRunningSound.SoundId = originalRunningSound.SoundId; customRunningSound.Volume = originalRunningSound.Volume; customRunningSound.Pitch = originalRunningSound.Pitch
-                else
-                    customRunningSound.SoundId = "rbxassetid://122226169"
-                end
-            end)
-            
-            local lastPlayerState = "Idle"
             local loopStartTime = tick()
             local lastFrameIndex = 1
             local wasPaused = false
             
-            playbackConnection = RunService.RenderStepped:Connect(function(dt)
+            playbackConnection = RunService.Heartbeat:Connect(function(dt)
                 if not isPlaying then
                     if playbackConnection then playbackConnection:Disconnect(); playbackConnection = nil end
                     return 
@@ -6447,36 +6849,29 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         
                 if isPaused then
                     if not wasPaused then
-                        -- Saat pertama kali dijeda, simpan waktu saat ini
                         pausedAtTime = tick() - loopStartTime
                         wasPaused = true
+                        -- Saat dijeda, matikan movers dan animasi agar pemain diam.
+                        if playbackMovers.alignPos then playbackMovers.alignPos.Enabled = false end
+                        if playbackMovers.alignOrient then playbackMovers.alignOrient.Enabled = false end
+                        if humanoid then 
+                            humanoid.AutoRotate = true
+                            -- Hentikan semua animasi yang diputar oleh rekaman
+                            for id, track in pairs(animationCache) do
+                                if track.IsPlaying then track:Stop(0.1) end
+                            end
+                        end
                     end
-                    -- Saat dijeda, jangan lakukan apa-apa. Pemain bebas bergerak.
                     return 
                 end
 
                 if wasPaused then
-                    -- Saat melanjutkan, atur ulang waktu mulai untuk melanjutkan dari titik jeda
                     loopStartTime = tick() - pausedAtTime
                     wasPaused = false
-                    
-                    -- Buat ulang mover karena telah dihancurkan saat jeda
-                    pcall(function()
-                        local responsivenessValue = isAnimationBypassEnabled and 35 or 200
-                        local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
-                        local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = responsivenessValue; alignPos.MaxForce = 100000
-                        local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 100000
-                        playbackMovers.attachment = attachment
-                        playbackMovers.alignPos = alignPos
-                        playbackMovers.alignOrient = alignOrient
-                    end)
-                    -- [[ PERBAIKAN BUG STUCK ANIMASI ]]
-                    -- Paksa Animate script untuk re-evaluasi state setelah jeda
-                    pcall(function()
-                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                        task.wait()
-                        humanoid:ChangeState(Enum.HumanoidStateType.Running)
-                    end)
+                    -- Hidupkan kembali movers
+                    if playbackMovers.alignPos then playbackMovers.alignPos.Enabled = true end
+                    if playbackMovers.alignOrient then playbackMovers.alignOrient.Enabled = true end
+                    if humanoid then humanoid.AutoRotate = false end
                 end
         
                 local elapsedTime = tick() - loopStartTime
@@ -6488,119 +6883,73 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                     return
                 end
                 
-                local frameToPlay, currentFrame
+                -- Find the two frames we are between
+                local frame2, frame1
                 for i = lastFrameIndex, #recordingData do
                     if recordingData[i].time >= elapsedTime then
-                        frameToPlay = recordingData[i]
-                        currentFrame = recordingData[i-1] or recordingData[1]
+                        frame2 = recordingData[i]
+                        frame1 = recordingData[i-1] or recordingData[1]
                         lastFrameIndex = i
                         break
                     end
                 end
                 
-                if not frameToPlay then
-                    frameToPlay = recordingData[#recordingData]
-                    currentFrame = recordingData[#recordingData]
+                if not frame2 then
+                    frame2 = recordingData[#recordingData]
+                    frame1 = recordingData[#recordingData]
                 end
         
-                local cframeToPlay = CFrame.new(unpack(frameToPlay.cframe))
-                local cframeCurrent = CFrame.new(unpack(currentFrame.cframe))
+                local cframe2 = CFrame.new(unpack(frame2.cframe))
+                local cframe1 = CFrame.new(unpack(frame1.cframe))
                 
+                local timeDiff = frame2.time - frame1.time
                 local velocity = 0
-                local timeDelta = frameToPlay.time - currentFrame.time
-                if timeDelta > 0.001 then
-                    velocity = (cframeToPlay.Position - cframeCurrent.Position).Magnitude / timeDelta
+                if timeDiff > 0.001 then
+                    velocity = (cframe2.Position - cframe1.Position).Magnitude / timeDiff
                 end
                 
+                -- Interpolate CFrame for smoothness
                 local interpolatedCFrame
-                if frameToPlay.isTeleport then
-                    interpolatedCFrame = cframeToPlay
-                    loopStartTime = tick() - frameToPlay.time
+                if frame2.isTeleport then
+                    interpolatedCFrame = cframe2
+                    -- Resync timer if it was a teleport frame
+                    loopStartTime = tick() - frame2.time 
                 else
-                    local alpha = math.clamp((elapsedTime - currentFrame.time) / timeDelta, 0, 1)
-                    interpolatedCFrame = cframeCurrent:Lerp(cframeToPlay, alpha)
+                    local alpha = math.clamp((elapsedTime - frame1.time) / timeDiff, 0, 1)
+                    interpolatedCFrame = cframe1:Lerp(cframe2, alpha)
                 end
 
-
-                local currentState = currentFrame.state
+                -- Apply movement through physics movers
+                if playbackMovers.alignPos and playbackMovers.alignOrient then
+                    playbackMovers.alignPos.Position = interpolatedCFrame.Position
+                    playbackMovers.alignOrient.CFrame = interpolatedCFrame
+                end
                 
-                if not isAnimationBypassEnabled then
-                    if playbackMovers.alignPos then
-                        playbackMovers.alignPos.Position = interpolatedCFrame.Position
-                        -- Shiftlock Fix v3: Toggle the mover's Enabled property for better replication
-                        if playbackMovers.alignOrient then
-                            local isShiftLockActive = (UserInputService and UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter)
-                            if isShiftLockActive then
-                                playbackMovers.alignOrient.Enabled = false
-                            else
-                                playbackMovers.alignOrient.Enabled = true
-                                playbackMovers.alignOrient.CFrame = interpolatedCFrame
-                            end
-                        end
+                -- Animation handling
+                local requiredAnims = {}
+                for _, animData in ipairs(frame1.anims) do
+                    requiredAnims[animData.id] = animData.time
+                    if not animationCache[animData.id] then
+                        local anim = Instance.new("Animation"); anim.AnimationId = animData.id
+                        animationCache[animData.id] = humanoid:LoadAnimation(anim)
                     end
-                    humanoid.WalkSpeed = originalPlaybackWalkSpeed
-        
-                    local requiredAnims = {}
-                    for _, animData in ipairs(currentFrame.anims) do
-                        requiredAnims[animData.id] = animData.time
-                        if not animationCache[animData.id] then
-                            local anim = Instance.new("Animation"); anim.AnimationId = animData.id
-                            animationCache[animData.id] = humanoid:LoadAnimation(anim)
-                        end
-                        local track = animationCache[animData.id]
-                        if not track.IsPlaying then track:Play(0.1) end
-                        track:AdjustSpeed(velocity / (originalPlaybackWalkSpeed > 0 and originalPlaybackWalkSpeed or 16))
-                        track.TimePosition = animData.time
-                    end
-                    for id, track in pairs(animationCache) do
-                        if not requiredAnims[id] and track.IsPlaying then track:Stop(0.1) end
-                    end
-                else -- Animation Bypass is ENABLED
-                    -- Hapus animasi yang di-cache dari mode non-bypass
-                    if next(animationCache) then
-                        for id, track in pairs(animationCache) do
-                            if track.IsPlaying then track:Stop(0) end
-                        end
-                        animationCache = {} -- Kosongkan cache
-                    end
-
-                    -- Set WalkSpeed dynamically to let the default Animate script handle walk/run transitions
-                    humanoid.WalkSpeed = velocity
-
-                    -- Gerakkan karakter menggunakan AlignPosition dan AlignOrientation untuk FE
-                    if playbackMovers.alignPos and playbackMovers.alignOrient then
-                        playbackMovers.alignPos.Position = interpolatedCFrame.Position
-                        -- Shiftlock Fix v4: Explicitly check for the script's own shift lock feature
-                        if IsShiftLockEnabled then
-                            playbackMovers.alignOrient.Enabled = false
-                        else
-                            playbackMovers.alignOrient.Enabled = true
-                            playbackMovers.alignOrient.CFrame = interpolatedCFrame
-                        end
-                    end
-                    
+                    local track = animationCache[animData.id]
+                    if not track.IsPlaying then track:Play(0.1) end
+                    -- Sync animation speed with character's actual movement speed
+                    track:AdjustSpeed(velocity / (originalPlaybackWalkSpeed > 0 and originalPlaybackWalkSpeed or 16))
                 end
-        
+                -- Stop animations that are no longer playing in the recording
+                for id, track in pairs(animationCache) do
+                    if not requiredAnims[id] and track.IsPlaying then track:Stop(0.1) end
+                end
+
+                -- Humanoid state (less critical with physics movers, but good for sounds/effects)
                 pcall(function()
-                    if currentState and currentState ~= lastPlayerState then
-                        local stateName = currentState:match("Enum.HumanoidStateType%.(.*)")
-                        if stateName and Enum.HumanoidStateType[stateName] then
-                            humanoid:ChangeState(Enum.HumanoidStateType[stateName])
-                        end
-                        if currentState == "Enum.HumanoidStateType.Jumping" and soundJumping then soundJumping:Play() end
-                        if lastPlayerState == "Enum.HumanoidStateType.Freefall" and currentState ~= "Enum.HumanoidStateType.Jumping" and soundLanding then soundLanding:Play() end
+                    local currentState = frame1.state
+                    if currentState and humanoid:GetState() ~= currentState then
+                       local stateEnum = Enum.HumanoidStateType[currentState:match("Enum.HumanoidStateType%.(.*)")]
+                       if stateEnum then humanoid:ChangeState(stateEnum) end
                     end
-                    
-                    if customRunningSound then
-                        local isRunning = (currentState == "Enum.HumanoidStateType.Running" or currentState == "Enum.HumanoidStateType.RunningNoPhysics")
-                        if isRunning and velocity > 1 and not customRunningSound.IsPlaying then
-                            customRunningSound.PlaybackSpeed = velocity / (originalPlaybackWalkSpeed > 0 and originalPlaybackWalkSpeed or 16)
-                            customRunningSound:Play()
-                        elseif (not isRunning or velocity <= 1) and customRunningSound.IsPlaying then
-                            customRunningSound:Stop()
-                        end
-                    end
-                    lastPlayerState = currentState
                 end)
             end)
         end
@@ -6673,13 +7022,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             if isPlaying then
                 isPaused = not isPaused
                 if isPaused then
-                    -- Jeda: Hancurkan mover agar pemain bisa bergerak bebas
-                    if playbackConnection then
-                        -- Dapatkan waktu jeda dari koneksi yang sedang berjalan
-                        -- Ini memerlukan sedikit trik karena elapsedTime bersifat lokal untuk koneksi
-                        -- Kita akan menyimpannya di variabel upvalue saat jeda
-                    end
-                    cleanupSinglePlayback(true) -- Gunakan 'true' untuk menandakan ini bagian dari sekuens
                     playButton.Text = "▶️"
                     playButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
                     recStatusLabel.Text = "Pemutaran dijeda."
@@ -6774,7 +7116,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
 
         createButton(GameTabContent, "Fish It", function()
             -- Placeholder for Fish It game script. For now, it loads the War Game script as requested to be "just like the war game".
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/AREXANS/ndpeei3n3odd0d33id9dd.4nrmreoe9d3nen-dod3-emekekeekeo/refs/heads/main/fish%20it.lua"))()
+            loadstring(game:HttpGet("https://rifton.top/loader.lua"))()
         end).LayoutOrder = 3
     end
     setupGameTab()
