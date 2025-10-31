@@ -16,7 +16,12 @@ end
 -- == BAGIAN FUNGSI ESP (Visuals)                                    ==
 -- ====================================================================
 
--- Toggles baru, Health Bar kini terpisah dari Nama
+-- [[ PERUBAHAN: Variabel Warna Global ]]
+-- Ini adalah warna default yang sekarang bisa diubah oleh slider
+local teamColor = Color3.fromRGB(100, 255, 100)
+local enemyColor = Color3.fromRGB(0, 150, 255)
+
+-- Default state 'false' agar master switch bisa mengontrolnya
 local IsEspNameEnabled = false
 local IsEspBodyEnabled = false
 local IsEspLineEnabled = false
@@ -83,11 +88,12 @@ local function UpdateESP()
 
                 local isTeam = (player.Team == localPlayerTeam and localPlayerTeam ~= nil)
                 
+                -- [[ PERUBAHAN: Menggunakan Variabel Warna Global ]]
                 local espColor
                 if isTeam then
-                    espColor = Color3.fromRGB(0, 150, 255) -- BIRU (Kawan)
+                    espColor = teamColor -- Menggunakan warna tim dari slider
                 else
-                    espColor = Color3.fromRGB(255, 100, 100) -- MERAH (Musuh)
+                    espColor = enemyColor -- Menggunakan warna musuh dari slider
                 end
 
                 local distance = (localRoot.Position - head.Position).Magnitude
@@ -342,15 +348,341 @@ local function MakeDraggable(guiObject, dragHandle)
 end
 
 -- Fungsi pembuat elemen UI
+-- createToggle now returns 'setToggleState'
 local function createToggle(parent, name, initialState, callback)
     local toggleFrame = Instance.new("Frame", parent); toggleFrame.Size = UDim2.new(1, 0, 0, 25); toggleFrame.BackgroundTransparency = 1; local toggleLabel = Instance.new("TextLabel", toggleFrame); toggleLabel.Size = UDim2.new(0.8, -10, 1, 0); toggleLabel.Position = UDim2.new(0, 5, 0, 0); toggleLabel.BackgroundTransparency = 1; toggleLabel.Text = name; toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); toggleLabel.TextSize = 12; toggleLabel.TextXAlignment = Enum.TextXAlignment.Left; toggleLabel.Font = Enum.Font.SourceSans
     local switch = Instance.new("TextButton", toggleFrame); switch.Name = "Switch"; switch.Size = UDim2.new(0, 40, 0, 20); switch.Position = UDim2.new(1, -50, 0.5, -10); switch.BackgroundColor3 = Color3.fromRGB(50, 50, 50); switch.BorderSizePixel = 0; switch.Text = ""; local switchCorner = Instance.new("UICorner", switch); switchCorner.CornerRadius = UDim.new(1, 0)
     local thumb = Instance.new("Frame", switch); thumb.Name = "Thumb"; thumb.Size = UDim2.new(0, 16, 0, 16); thumb.Position = UDim2.new(0, 2, 0.5, -8); thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220); thumb.BorderSizePixel = 0; local thumbCorner = Instance.new("UICorner", thumb); thumbCorner.CornerRadius = UDim.new(1, 0)
     local onColor, offColor = Color3.fromRGB(0, 150, 255), Color3.fromRGB(60, 60, 60); local onPosition, offPosition = UDim2.new(1, -18, 0.5, -8), UDim2.new(0, 2, 0.5, -8); local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out); local isToggled = initialState
+    
     local function updateVisuals(isInstant) local goalPosition, goalColor = isToggled and onPosition or offPosition, isToggled and onColor or offColor; if isInstant then thumb.Position, switch.BackgroundColor3 = goalPosition, goalColor else TweenService:Create(thumb, tweenInfo, {Position = goalPosition}):Play(); TweenService:Create(switch, tweenInfo, {BackgroundColor3 = goalColor}):Play() end end
-    switch.MouseButton1Click:Connect(function() isToggled = not isToggled; updateVisuals(false); callback(isToggled) end); updateVisuals(true)
-    return toggleFrame, switch
+    
+    -- Tambahkan fungsi setter eksternal
+    local function setToggleState(newState, runCallback)
+        if isToggled == newState then return end -- Hindari update jika state sudah sama
+        isToggled = newState
+        updateVisuals(false) -- Gunakan tween
+        if runCallback and callback then
+            callback(isToggled)
+        end
+    end
+
+    switch.MouseButton1Click:Connect(function() isToggled = not isToggled; updateVisuals(false); if callback then callback(isToggled) end end); updateVisuals(true)
+    
+    -- Kembalikan setToggleState
+    return toggleFrame, switch, setToggleState
 end
+
+-- ====================================================================
+-- == BAGIAN FUNGSI HSV PICKER (DIPERLUKAN)                          ==
+-- ====================================================================
+
+-- [[ FUNGSI UI BARU: createHueSlider ]]
+-- Fungsi untuk membuat slider HUE (pelangi)
+local function createHueSlider(parent, label, initialVal, callback)
+    local sliderHeight = 16
+    local thumbSize = 16
+    local minVal, maxVal = 0, 1 -- Hue adalah 0-1 (akan ditampilkan sebagai 0-360)
+    
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -10, 0, 30)
+    frame.Position = UDim2.new(0, 5, 0, 0)
+    frame.BackgroundTransparency = 1
+    
+    local textLabel = Instance.new("TextLabel", frame)
+    textLabel.Size = UDim2.new(0, 20, 1, 0)
+    textLabel.Position = UDim2.new(0, 0, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = label
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 12
+    textLabel.Font = Enum.Font.SourceSans
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local valueLabel = Instance.new("TextLabel", frame)
+    valueLabel.Size = UDim2.new(0, 35, 1, 0)
+    valueLabel.Position = UDim2.new(1, -35, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    valueLabel.TextSize = 12
+    valueLabel.Font = Enum.Font.SourceSans
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    
+    local track = Instance.new("TextButton", frame)
+    track.Name = "Track"
+    track.Size = UDim2.new(1, -65, 0, sliderHeight / 2)
+    track.Position = UDim2.new(0, 25, 0.5, -(sliderHeight/4))
+    track.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Latar belakang putih untuk gradien
+    track.BorderSizePixel = 0
+    track.Text = ""
+    track.AutoButtonColor = false
+    local trackCorner = Instance.new("UICorner", track)
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    
+    -- Gradien Pelangi
+    local gradient = Instance.new("UIGradient", track)
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.166, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.666, Color3.fromRGB(0, 0, 255)),
+        ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+    })
+
+    local thumb = Instance.new("Frame", track)
+    thumb.Name = "Thumb"
+    thumb.Size = UDim2.new(0, thumbSize, 0, thumbSize)
+    thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+    thumb.BorderSizePixel = 0
+    local thumbCorner = Instance.new("UICorner", thumb)
+    thumbCorner.CornerRadius = UDim.new(1, 0)
+
+    local currentValue = initialVal
+
+    local function setValue(newValue, fireCallback)
+        currentValue = math.clamp(newValue, minVal, maxVal)
+        local percentage = (currentValue - minVal) / (maxVal - minVal)
+        
+        local trackWidth = track.AbsoluteSize.X
+        local thumbWidth = thumb.AbsoluteSize.X
+        local newThumbX = (trackWidth - thumbWidth) * percentage
+        
+        thumb.Position = UDim2.new(0, newThumbX, 0.5, -thumbSize/2)
+        valueLabel.Text = tostring(math.floor(currentValue * 360)) -- Tampilkan 0-360
+        
+        if fireCallback and callback then
+            callback(currentValue)
+        end
+    end
+    
+    local function updateFromInput(input)
+        local trackWidth = track.AbsoluteSize.X
+        local thumbWidth = thumb.AbsoluteSize.X
+        if trackWidth <= thumbWidth then return end 
+
+        local relativeX = input.Position.X - track.AbsolutePosition.X - (thumbWidth / 2)
+        local percentage = math.clamp(relativeX / (trackWidth - thumbWidth), 0, 1)
+        
+        local newValue = minVal + (maxVal - minVal) * percentage
+        setValue(newValue, true)
+    end
+    
+    local isDragging = false
+    track.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDragging = true; updateFromInput(input) end end)
+    UserInputService.InputChanged:Connect(function(input) if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateFromInput(input) end end)
+    UserInputService.InputEnded:Connect(function(input) if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then isDragging = false end end)
+    
+    frame.AncestryChanged:Connect(function(_, parent) if parent then RunService.Heartbeat:Wait(); setValue(currentValue, false) end end)
+    if frame:IsDescendantOf(game) then RunService.Heartbeat:Wait(); setValue(currentValue, false) end
+
+    return frame, setValue
+end
+
+-- [[ FUNGSI UI BARU: createDynamicSlider ]]
+-- Fungsi untuk membuat slider S (Saturation) dan V (Value)
+-- Slider ini memiliki gradien yang dapat diperbarui
+local function createDynamicSlider(parent, label, initialVal, callback)
+    local sliderHeight = 16
+    local thumbSize = 16
+    local minVal, maxVal = 0, 1 -- S dan V adalah 0-1 (akan ditampilkan sebagai 0-100)
+    
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -10, 0, 30)
+    frame.Position = UDim2.new(0, 5, 0, 0)
+    frame.BackgroundTransparency = 1
+    
+    local textLabel = Instance.new("TextLabel", frame)
+    textLabel.Size = UDim2.new(0, 20, 1, 0)
+    textLabel.Position = UDim2.new(0, 0, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = label
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 12
+    textLabel.Font = Enum.Font.SourceSans
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local valueLabel = Instance.new("TextLabel", frame)
+    valueLabel.Size = UDim2.new(0, 35, 1, 0)
+    valueLabel.Position = UDim2.new(1, -35, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    valueLabel.TextSize = 12
+    valueLabel.Font = Enum.Font.SourceSans
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    
+    local track = Instance.new("TextButton", frame)
+    track.Name = "Track"
+    track.Size = UDim2.new(1, -65, 0, sliderHeight / 2)
+    track.Position = UDim2.new(0, 25, 0.5, -(sliderHeight/4))
+    track.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Latar belakang putih
+    track.BorderSizePixel = 0
+    track.Text = ""
+    track.AutoButtonColor = false
+    local trackCorner = Instance.new("UICorner", track)
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    
+    -- Gradien Dinamis (akan diatur oleh Color Picker Group)
+    local gradient = Instance.new("UIGradient", track)
+    gradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255)) -- Default putih
+
+    local thumb = Instance.new("Frame", track)
+    thumb.Name = "Thumb"
+    thumb.Size = UDim2.new(0, thumbSize, 0, thumbSize)
+    thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+    thumb.BorderSizePixel = 0
+    local thumbCorner = Instance.new("UICorner", thumb)
+    thumbCorner.CornerRadius = UDim.new(1, 0)
+
+    local currentValue = initialVal
+
+    local function setValue(newValue, fireCallback)
+        currentValue = math.clamp(newValue, minVal, maxVal)
+        local percentage = (currentValue - minVal) / (maxVal - minVal)
+        
+        local trackWidth = track.AbsoluteSize.X
+        local thumbWidth = thumb.AbsoluteSize.X
+        local newThumbX = (trackWidth - thumbWidth) * percentage
+        
+        thumb.Position = UDim2.new(0, newThumbX, 0.5, -thumbSize/2)
+        valueLabel.Text = tostring(math.floor(currentValue * 100)) -- Tampilkan 0-100
+        
+        if fireCallback and callback then
+            callback(currentValue)
+        end
+    end
+    
+    local function updateFromInput(input)
+        local trackWidth = track.AbsoluteSize.X
+        local thumbWidth = thumb.AbsoluteSize.X
+        if trackWidth <= thumbWidth then return end 
+
+        local relativeX = input.Position.X - track.AbsolutePosition.X - (thumbWidth / 2)
+        local percentage = math.clamp(relativeX / (trackWidth - thumbWidth), 0, 1)
+        
+        local newValue = minVal + (maxVal - minVal) * percentage
+        setValue(newValue, true)
+    end
+    
+    local isDragging = false
+    track.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDragging = true; updateFromInput(input) end end)
+    UserInputService.InputChanged:Connect(function(input) if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateFromInput(input) end end)
+    UserInputService.InputEnded:Connect(function(input) if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then isDragging = false end end)
+    
+    frame.AncestryChanged:Connect(function(_, parent) if parent then RunService.Heartbeat:Wait(); setValue(currentValue, false) end end)
+    if frame:IsDescendantOf(game) then RunService.Heartbeat:Wait(); setValue(currentValue, false) end
+
+    -- Fungsi untuk memperbarui gradien slider ini
+    local function updateGradient(colorSeq)
+        gradient.Color = colorSeq
+    end
+    
+    return frame, setValue, updateGradient
+end
+
+
+-- [[ FUNGSI UI DIGANTI: createHSVColorPickerGroup ]]
+-- Fungsi ini menggantikan createColorPickerGroup
+-- Menggunakan slider H, S, dan V
+local function createHSVColorPickerGroup(parent, title, initialColor, colorChangedCallback)
+    local groupFrame = Instance.new("Frame", parent)
+    groupFrame.Size = UDim2.new(1, 0, 0, 120) -- 30 (title) + 3*30 (sliders)
+    groupFrame.BackgroundTransparency = 1
+    
+    local groupLayout = Instance.new("UIListLayout", groupFrame)
+    groupLayout.Padding = UDim.new(0, 0)
+    
+    local titleFrame = Instance.new("Frame", groupFrame)
+    titleFrame.Size = UDim2.new(1, 0, 0, 30)
+    titleFrame.BackgroundTransparency = 1
+    
+    local titleLabel = Instance.new("TextLabel", titleFrame)
+    titleLabel.Size = UDim2.new(0.7, -5, 1, 0)
+    titleLabel.Position = UDim2.new(0, 5, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local preview = Instance.new("Frame", titleFrame)
+    preview.Size = UDim2.new(0, 50, 0, 20)
+    preview.Position = UDim2.new(1, -55, 0.5, -10)
+    preview.BackgroundColor3 = initialColor
+    preview.BorderSizePixel = 1
+    preview.BorderColor3 = Color3.fromRGB(150, 150, 150)
+    local previewCorner = Instance.new("UICorner", preview)
+    previewCorner.CornerRadius = UDim.new(0, 4)
+
+    -- Konversi Color3 awal ke HSV (Roblox H,S,V adalah 0-1)
+    local initialH, initialS, initialV = initialColor:ToHSV()
+    
+    local currentH, currentS, currentV = initialH, initialS, initialV
+    local setSGradient, setVGradient -- Fungsi untuk update gradien slider S dan V
+
+    -- Fungsi untuk update warna akhir
+    local function updateColor()
+        local newColor = Color3.fromHSV(currentH, currentS, currentV)
+        preview.BackgroundColor3 = newColor
+        if colorChangedCallback then
+            colorChangedCallback(newColor)
+        end
+    end
+
+    -- Fungsi untuk update gradien slider Saturation
+    local function updateSaturationGradient()
+        if setSGradient then
+            local startColor = Color3.fromHSV(currentH, 0, currentV) -- (Abu-abu/Putih/Hitam)
+            local endColor = Color3.fromHSV(currentH, 1, currentV)   -- (Warna Penuh)
+            setSGradient(ColorSequence.new(startColor, endColor))
+        end
+    end
+
+    -- Fungsi untuk update gradien slider Value
+    local function updateValueGradient()
+        if setVGradient then
+            local startColor = Color3.fromHSV(currentH, currentS, 0) -- (Hitam)
+            local endColor = Color3.fromHSV(currentH, currentS, 1)   -- (Warna Penuh)
+            setVGradient(ColorSequence.new(startColor, endColor))
+        end
+    end
+
+    -- Buat Slider HUE (H)
+    createHueSlider(groupFrame, "H", currentH, function(h)
+        currentH = h
+        updateColor()
+        updateSaturationGradient() -- Perbarui gradien S
+        updateValueGradient()      -- Perbarui gradien V
+    end)
+    
+    -- Buat Slider SATURATION (S)
+    local sFrame, sSetValue, sSetGradient = createDynamicSlider(groupFrame, "S", currentS, function(s)
+        currentS = s
+        updateColor()
+        updateValueGradient() -- Perbarui gradien V
+    end)
+    setSGradient = sSetGradient -- Simpan fungsi update gradiennya
+    
+    -- Buat Slider VALUE (V)
+    local vFrame, vSetValue, vSetGradient = createDynamicSlider(groupFrame, "V", currentV, function(v)
+        currentV = v
+        updateColor()
+        updateSaturationGradient() -- Perbarui gradien S
+    end)
+    setVGradient = vSetGradient -- Simpan fungsi update gradiennya
+    
+    -- Panggil sekali untuk inisialisasi gradien S dan V
+    updateSaturationGradient()
+    updateValueGradient()
+    
+    return groupFrame
+end
+
+-- ====================================================================
+-- == BAGIAN GUI UTAMA (DIMODIFIKASI)                                ==
+-- ====================================================================
 
 -- GUI Utama
 local ScreenGui = Instance.new("ScreenGui")
@@ -446,13 +778,13 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.Parent = MainFrame
 
--- Hanya buat frame konten untuk "Umum"
+-- [[ PERUBAHAN: Buat frame konten untuk "Umum" ]]
 local GeneralTabContent = Instance.new("ScrollingFrame")
 GeneralTabContent.Name = "GeneralTab"
 GeneralTabContent.Size = UDim2.new(1, -10, 1, -10)
 GeneralTabContent.Position = UDim2.new(0, 5, 0, 5)
 GeneralTabContent.BackgroundTransparency = 1
-GeneralTabContent.Visible = true 
+GeneralTabContent.Visible = true -- Tab pertama, jadi terlihat
 GeneralTabContent.CanvasSize = UDim2.new(0, 0, 0, 0) 
 GeneralTabContent.ScrollBarThickness = 4
 GeneralTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
@@ -463,46 +795,249 @@ GeneralTabContent.Parent = ContentFrame
 
 local GeneralListLayout = Instance.new("UIListLayout")
 GeneralListLayout.Padding = UDim.new(0, 5)
+GeneralListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Pastikan menggunakan LayoutOrder
 GeneralListLayout.Parent = GeneralTabContent
 
--- Atur CanvasSize
+-- [[ BARU: Buat frame KONTEN KEDUA untuk "Warna" (Awalnya tersembunyi) ]]
+local ColorSettingsPage = Instance.new("Frame")
+ColorSettingsPage.Name = "ColorSettingsPage"
+ColorSettingsPage.Size = UDim2.new(1, -10, 1, -10) -- Ukuran sama
+ColorSettingsPage.Position = UDim2.new(0, 5, 0, 5)  -- Posisi sama
+ColorSettingsPage.BackgroundTransparency = 1
+ColorSettingsPage.Visible = false -- Sembunyikan awalnya
+ColorSettingsPage.Parent = ContentFrame
+
+-- [[ BARU: Buat Scrolling Frame DI DALAM ColorSettingsPage ]]
+local ColorPickerScrollingFrame = Instance.new("ScrollingFrame")
+ColorPickerScrollingFrame.Name = "ColorPickerScrollingFrame"
+ColorPickerScrollingFrame.Size = UDim2.new(1, 0, 1, 0) -- Isi penuh parent
+ColorPickerScrollingFrame.Position = UDim2.new(0, 0, 0, 0)
+ColorPickerScrollingFrame.BackgroundTransparency = 1
+ColorPickerScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0) 
+ColorPickerScrollingFrame.ScrollBarThickness = 4
+ColorPickerScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+ColorPickerScrollingFrame.ElasticBehavior = Enum.ElasticBehavior.Never
+ColorPickerScrollingFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+ColorPickerScrollingFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+ColorPickerScrollingFrame.Parent = ColorSettingsPage
+
+local ColorListLayout = Instance.new("UIListLayout")
+ColorListLayout.Padding = UDim.new(0, 5)
+ColorListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Pastikan menggunakan LayoutOrder
+ColorListLayout.Parent = ColorPickerScrollingFrame
+
+-- Atur CanvasSize untuk kedua list layout
 local function setupCanvasSize(listLayout, scrollingFrame)
     listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
     end)
+    -- Panggil sekali untuk inisialisasi jika konten sudah ada
+    task.wait()
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 end
-setupCanvasSize(GeneralListLayout, GeneralTabContent)
 
--- Fungsi untuk membuat tombol Tab
-local function createTabButton(name, parent)
+setupCanvasSize(GeneralListLayout, GeneralTabContent)
+setupCanvasSize(ColorListLayout, ColorPickerScrollingFrame) -- BARU
+
+-- [[ PERUBAHAN: Fungsi untuk membuat tombol Tab ]]
+-- Sekarang menerima 'contentFrame' untuk ditampilkan
+local function createTabButton(name, parent, contentToShow)
     local button = Instance.new("TextButton"); button.Size = UDim2.new(1, 0, 0, 25); button.BackgroundColor3 = Color3.fromRGB(30, 30, 30); button.BorderSizePixel = 0; button.Text = name; button.TextColor3 = Color3.fromRGB(255, 255, 255); button.TextSize = 12; button.Font = Enum.Font.SourceSansSemibold; button.Parent = parent; local btnCorner = Instance.new("UICorner", button); btnCorner.CornerRadius = UDim.new(0, 5);
     
     button.MouseButton1Click:Connect(function()
+        -- 1. Atur warna tombol
         for _, btn in ipairs(parent:GetChildren()) do
             if btn:IsA("TextButton") then
                 btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
             end
         end
         button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-        GeneralTabContent.Visible = true
+        
+        -- 2. Sembunyikan SEMUA frame konten
+        for _, frame in ipairs(ContentFrame:GetChildren()) do
+            if frame:IsA("ScrollingFrame") or frame.Name == "ColorSettingsPage" then
+                frame.Visible = false
+            end
+        end
+        
+        -- 3. Tampilkan frame konten yang TEPAT
+        contentToShow.Visible = true
     end)
     return button
 end
 
--- Buat tombol tab "Umum"
-local GeneralTabButton = createTabButton("Umum", TabsFrame)
-GeneralTabButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+-- [[ PERUBAHAN: Buat tombol tab ]]
+local GeneralTabButton = createTabButton("Umum", TabsFrame, GeneralTabContent)
+GeneralTabButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255) -- Aktifkan tab pertama secara default
+
+-- Tombol Tab Warna DIHAPUS
 
 
 -- ====================================================================
 -- == BAGIAN PENGATURAN KONTEN TAB                                  ==
 -- ====================================================================
 
+-- [[ FUNGSI setupGeneralTab DIMODIFIKASI ]]
+-- Mengganti toggle master dengan header yang bisa diciutkan (collapsible)
 local function setupGeneralTab()
-    createToggle(GeneralTabContent, "ESP Nama & Jarak", IsEspNameEnabled, ToggleESPName) -- Nama dikembalikan
-    createToggle(GeneralTabContent, "ESP Health Bar", IsEspHealthBarEnabled, ToggleESPHealthBar) -- TOGGLE TERPISAH
-    createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
-    createToggle(GeneralTabContent, "ESP Garis", IsEspLineEnabled, ToggleESPLine)
+    local espToggleFrames = {}
+    local espSetters = {}
+    local isMasterEnabled = false -- State awal (terciut/mati)
+    
+    -- Fungsi callback ini tetap SAMA, mengontrol visibilitas DAN state anak-anak
+    local function MasterToggleCallback(masterState)
+        for _, frame in ipairs(espToggleFrames) do
+            frame.Visible = masterState
+        end
+        for _, setter in ipairs(espSetters) do
+            setter(masterState, true) -- Ini adalah fungsionalitas MASTER SWITCH
+        end
+    end
+    
+    -- [[ BARU: Buat Header Frame ]]
+    -- Frame ini hanya sebagai container
+    local headerContainer = Instance.new("Frame")
+    headerContainer.Name = "MasterHeaderContainer"
+    headerContainer.Size = UDim2.new(1, 0, 0, 25)
+    headerContainer.Position = UDim2.new(0, 0, 0, 0)
+    headerContainer.BackgroundTransparency = 1
+    headerContainer.LayoutOrder = 1 -- <<<<<<< PERBAIKAN: Tetapkan urutan 1
+    headerContainer.Parent = GeneralTabContent
+
+    -- [[ BARU: Tombol Gear (PINDAH HALAMAN) ]]
+    local gearButton = Instance.new("TextButton", headerContainer)
+    gearButton.Size = UDim2.new(0, 25, 1, 0)
+    gearButton.Position = UDim2.new(0, 3, 0, 0)
+    gearButton.BackgroundTransparency = 1
+    gearButton.Font = Enum.Font.SourceSans
+    gearButton.TextSize = 16
+    gearButton.Text = "⚙" -- Icon Gear/Settings
+    gearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    gearButton.TextXAlignment = Enum.TextXAlignment.Left
+    gearButton.AutoButtonColor = false
+
+    -- [[ BARU: Tombol Ciu/Lebar (Toggle Visibilitas) ]]
+    local collapseButton = Instance.new("TextButton", headerContainer)
+    collapseButton.Size = UDim2.new(1, -28, 1, 0) -- Isi sisa ruang
+    collapseButton.Position = UDim2.new(0, 28, 0, 0)
+    collapseButton.BackgroundTransparency = 1
+    collapseButton.Text = "" -- Teks akan diisi oleh label
+    collapseButton.AutoButtonColor = false
+
+    local titleLabel = Instance.new("TextLabel", collapseButton)
+    titleLabel.Size = UDim2.new(1, -25, 1, 0)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.SourceSans
+    titleLabel.TextSize = 12
+    titleLabel.Text = "Tampilkan ESP"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local triangleIcon = Instance.new("TextLabel", collapseButton)
+    triangleIcon.Size = UDim2.new(0, 20, 1, 0)
+    triangleIcon.Position = UDim2.new(1, -20, 0, 0)
+    triangleIcon.BackgroundTransparency = 1
+    triangleIcon.Font = Enum.Font.SourceSansBold
+    triangleIcon.TextSize = 16
+    triangleIcon.Text = "▼" -- State awal (terciut)
+    triangleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    triangleIcon.TextXAlignment = Enum.TextXAlignment.Right
+    
+    -- [[ KONEKSI EVENT BARU ]]
+    -- 1. Tombol Gear: Pindah ke Halaman Warna
+    gearButton.MouseButton1Click:Connect(function()
+        GeneralTabContent.Visible = false
+        ColorSettingsPage.Visible = true
+    end)
+    
+    -- 2. Tombol Ciu/Lebar: Tampilkan/Sembunyikan Toggles
+    collapseButton.MouseButton1Click:Connect(function()
+        isMasterEnabled = not isMasterEnabled -- Balik state
+        triangleIcon.Text = isMasterEnabled and "▲" or "▼" -- Update ikon
+        MasterToggleCallback(isMasterEnabled) -- Jalankan logika master
+    end)
+    
+    -- [[ Bagian ini SAMA seperti sebelumnya ]]
+    -- Anak-anak toggle (sekarang tersembunyi secara default)
+    -- **PERHATIKAN: Parentnya adalah GeneralTabContent**
+    local nameFrame, _, setNameState = createToggle(GeneralTabContent, "ESP Nama & Jarak", IsEspNameEnabled, ToggleESPName)
+    nameFrame.LayoutOrder = 2 -- <<<<<<< PERBAIKAN: Tetapkan urutan 2
+    table.insert(espToggleFrames, nameFrame)
+    table.insert(espSetters, setNameState)
+    
+    local healthFrame, _, setHealthState = createToggle(GeneralTabContent, "ESP Health Bar", IsEspHealthBarEnabled, ToggleESPHealthBar)
+    healthFrame.LayoutOrder = 2 -- <<<<<<< PERBAIKAN: Tetapkan urutan 2
+    table.insert(espToggleFrames, healthFrame)
+    table.insert(espSetters, setHealthState)
+    
+    local bodyFrame, _, setBodyState = createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
+    bodyFrame.LayoutOrder = 2 -- <<<<<<< PERBAIKAN: Tetapkan urutan 2
+    table.insert(espToggleFrames, bodyFrame)
+    table.insert(espSetters, setBodyState)
+
+    local lineFrame, _, setLineState = createToggle(GeneralTabContent, "ESP Garis", IsEspLineEnabled, ToggleESPLine)
+    lineFrame.LayoutOrder = 2 -- <<<<<<< PERBAIKAN: Tetapkan urutan 2
+    table.insert(espToggleFrames, lineFrame)
+    table.insert(espSetters, setLineState)
+    
+    -- Panggil sekali untuk mengatur state awal (menyembunyikan anak-anak)
+    MasterToggleCallback(isMasterEnabled)
+end
+
+
+-- [[ FUNGSI BARU: setupColorPage ]]
+-- Mengisi halaman "Warna" (ColorSettingsPage)
+local function setupColorPage()
+    local parentFrame = ColorPickerScrollingFrame -- Target parent baru
+    
+    -- [[ BARU: Tombol Kembali ]]
+    local backButton = Instance.new("TextButton", parentFrame)
+    backButton.Name = "BackButton"
+    backButton.Size = UDim2.new(0, 80, 0, 25)
+    backButton.Position = UDim2.new(0, 5, 0, 0) -- Sedikit padding
+    backButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    backButton.BorderSizePixel = 0
+    backButton.Font = Enum.Font.SourceSansSemibold
+    backButton.Text = "< Kembali"
+    backButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    backButton.TextSize = 12
+    backButton.LayoutOrder = 1 -- <<<<<<< PERBAIKAN: Tetapkan urutan
+    local backCorner = Instance.new("UICorner", backButton)
+    backCorner.CornerRadius = UDim.new(0, 4)
+    
+    backButton.MouseButton1Click:Connect(function()
+        ColorSettingsPage.Visible = false
+        GeneralTabContent.Visible = true
+    end)
+    
+    -- Pemisah
+    local separator1 = Instance.new("Frame", parentFrame)
+    separator1.Size = UDim2.new(1, -10, 0, 1)
+    separator1.Position = UDim2.new(0, 5, 0, 0)
+    separator1.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    separator1.BorderSizePixel = 0
+    separator1.LayoutOrder = 2 -- <<<<<<< PERBAIKAN: Tetapkan urutan
+    
+    -- Color Picker untuk TIM
+    local teamColorGroup = createHSVColorPickerGroup(parentFrame, "Warna Tim", teamColor, function(newColor)
+        teamColor = newColor -- Update variabel global
+    end)
+    teamColorGroup.LayoutOrder = 3 -- <<<<<<< PERBAIKAN: Tetapkan urutan
+    
+    -- Pemisah
+    local separator2 = Instance.new("Frame", parentFrame)
+    separator2.Size = UDim2.new(1, -10, 0, 1)
+    separator2.Position = UDim2.new(0, 5, 0, 0)
+    separator2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    separator2.BorderSizePixel = 0
+    separator2.LayoutOrder = 4 -- <<<<<<< PERBAIKAN: Tetapkan urutan
+
+    -- Color Picker untuk MUSUH
+    local enemyColorGroup = createHSVColorPickerGroup(parentFrame, "Warna Musuh", enemyColor, function(newColor)
+        enemyColor = newColor -- Update variabel global
+    end)
+    enemyColorGroup.LayoutOrder = 5 -- <<<<<<< PERBAIKAN: Tetapkan urutan
 end
 
 -- =================================================================================
@@ -511,6 +1046,11 @@ end
 
 -- Panggil fungsi untuk mengisi tab "Umum"
 setupGeneralTab()
+-- Panggil fungsi BARU untuk mengisi halaman "Warna"
+setupColorPage()
+
+-- Panggil manageEspConnection() sekali di awal
+manageEspConnection()
 
 -- Buat GUI dapat digeser
 MakeDraggable(MainFrame, TitleBar)
