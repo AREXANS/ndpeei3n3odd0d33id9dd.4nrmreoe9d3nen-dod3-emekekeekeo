@@ -580,6 +580,8 @@ task.spawn(function()
             MaxWalkSpeed = 500,
             TeleportDistance = 100,
             FEInvisibleTransparency = 0.75,
+            SpectateCameraSensitivity = 0.004,
+            SpectateCameraSpeed = 50,
         }
     
         -- Variabel Status
@@ -1029,18 +1031,12 @@ task.spawn(function()
     GeneralTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     GeneralTabContent.Parent = ContentFrame
     
-    local TeleportTabContent = Instance.new("ScrollingFrame")
+    local TeleportTabContent = Instance.new("Frame")
     TeleportTabContent.Name = "TeleportTab"
     TeleportTabContent.Size = UDim2.new(1, -10, 1, -10)
     TeleportTabContent.Position = UDim2.new(0, 5, 0, 5)
     TeleportTabContent.BackgroundTransparency = 1
     TeleportTabContent.Visible = false
-    TeleportTabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TeleportTabContent.ScrollBarThickness = 4
-    TeleportTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
-    TeleportTabContent.ElasticBehavior = Enum.ElasticBehavior.Never
-    TeleportTabContent.VerticalScrollBarInset = Enum.ScrollBarInset.Always
-    TeleportTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     TeleportTabContent.Parent = ContentFrame
     
     local VipTabContent = Instance.new("ScrollingFrame")
@@ -1103,10 +1099,6 @@ task.spawn(function()
     GeneralListLayout.Parent = GeneralTabContent
     
     
-    local TeleportListLayout = Instance.new("UIListLayout")
-    TeleportListLayout.Padding = UDim.new(0, 2)
-    TeleportListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    TeleportListLayout.Parent = TeleportTabContent
     
     local VipListLayout = Instance.new("UIListLayout")
     VipListLayout.Padding = UDim.new(0, 5)
@@ -1130,7 +1122,6 @@ task.spawn(function()
     
     setupCanvasSize(PlayerListLayout, PlayerListContainer)
     setupCanvasSize(GeneralListLayout, GeneralTabContent)
-    setupCanvasSize(TeleportListLayout, TeleportTabContent)
     setupCanvasSize(VipListLayout, VipTabContent)
     setupCanvasSize(SettingsListLayout, SettingsTabContent)
     -- setupCanvasSize(RekamanListLayout, RekamanTabContent) -- [[ PERBAIKAN: Dihapus karena RekamanTabContent bukan lagi ScrollingFrame ]]
@@ -1374,7 +1365,9 @@ task.spawn(function()
             ShowTeleportIcon = showTeleportIcon,
             CopyMovementDelay = copyMovementDelay,
             CopyMovementBypassAnimation = copyMovementBypassAnimation,
-            FlingInvisible = flingInvisible
+            FlingInvisible = flingInvisible,
+            SpectateCameraSensitivity = Settings.SpectateCameraSensitivity,
+            SpectateCameraSpeed = Settings.SpectateCameraSpeed
         }
         
         pcall(function()
@@ -1420,6 +1413,8 @@ task.spawn(function()
                 copyMovementDelay = decodedData.CopyMovementDelay or 0.1
                 copyMovementBypassAnimation = decodedData.CopyMovementBypassAnimation or false
                 flingInvisible = decodedData.FlingInvisible or false
+                Settings.SpectateCameraSensitivity = decodedData.SpectateCameraSensitivity or 0.004
+                Settings.SpectateCameraSpeed = decodedData.SpectateCameraSpeed or 50
             end
         end)
         if not success then
@@ -1456,7 +1451,10 @@ task.spawn(function()
     
     -- [[ PERBAIKAN 1: Fungsi untuk memperbarui visibilitas ikon DAN ukuran tombol ]]
     local function updateTeleportIconVisibility()
-        for _, child in pairs(TeleportTabContent:GetChildren()) do
+        local listContainer = TeleportTabContent:FindFirstChild("TeleportListContainer")
+        if not listContainer then return end
+    
+        for _, child in pairs(listContainer:GetChildren()) do
             if child.Name == "TeleportLocationFrame" then
                 local actionsFrame = child:FindFirstChild("ActionsFrame")
                 local tpButton = child:FindFirstChildOfClass("TextButton")
@@ -1475,7 +1473,12 @@ task.spawn(function()
     
     -- [[ PERBAIKAN 1: Fungsi updateTeleportList dirombak untuk menangani ukuran awal tombol ]]
     updateTeleportList = function()
-        for _, child in pairs(TeleportTabContent:GetChildren()) do 
+        -- Dapatkan kontainer list yang benar, yang sekarang berada di dalam TeleportTabContent
+        local listContainer = TeleportTabContent:FindFirstChild("TeleportListContainer")
+        if not listContainer then return end -- Guard clause
+    
+        -- Hapus hanya item lokasi teleport dari kontainer list
+        for _, child in pairs(listContainer:GetChildren()) do 
             if child.Name == "TeleportLocationFrame" then 
                 child:Destroy() 
             end 
@@ -1488,7 +1491,7 @@ task.spawn(function()
             locFrame.Name = "TeleportLocationFrame"
             locFrame.Size = UDim2.new(1, 0, 0, 22) -- Disesuaikan dengan createButton
             locFrame.BackgroundTransparency = 1
-            locFrame.Parent = TeleportTabContent
+            locFrame.Parent = listContainer -- Parent diubah ke listContainer
             locFrame.LayoutOrder = i + layoutOrderOffset
             locFrame.ZIndex = 2
     
@@ -4783,8 +4786,8 @@ task.spawn(function()
         local JoystickThumb = JoystickBase.Thumb
         
         -- Setup variabel untuk kontrol kamera
-        local cameraRotationSensitivity = 0.004
-        local cameraMoveSpeed = 50
+        local cameraRotationSensitivity = Settings.SpectateCameraSensitivity
+        local cameraMoveSpeed = Settings.SpectateCameraSpeed
         local moveVector = Vector2.new(0, 0)
         local isJoystickActive = false
         local rotationInput = nil
@@ -5720,10 +5723,97 @@ task.spawn(function()
     
     
     setupTeleportTab = function()
-        -- [[ PERUBAHAN BESAR: Desain Ulang UI Teleport ke Dua Baris ]]
+        -- Header
+        local teleportHeaderFrame = Instance.new("Frame", TeleportTabContent)
+        teleportHeaderFrame.Size = UDim2.new(1, 0, 0, 30)
+        teleportHeaderFrame.BackgroundTransparency = 1
+        teleportHeaderFrame.LayoutOrder = 0
+    
+        local teleportTitleLabel = Instance.new("TextLabel", teleportHeaderFrame)
+        teleportTitleLabel.Name = "TeleportTitleLabel"
+        teleportTitleLabel.Size = UDim2.new(1, -20, 1, 0)
+        teleportTitleLabel.BackgroundTransparency = 1
+        teleportTitleLabel.Text = "Lokasi Tersimpan"
+        teleportTitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        teleportTitleLabel.TextSize = 12
+        teleportTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        teleportTitleLabel.Font = Enum.Font.SourceSansBold
+    
+        local settingsButton = Instance.new("TextButton", teleportHeaderFrame)
+        settingsButton.Name = "SettingsButton"
+        settingsButton.Size = UDim2.new(0, 15, 0, 15)
+        settingsButton.Position = UDim2.new(1, -15, 0.5, -7.5)
+        settingsButton.BackgroundTransparency = 1
+        settingsButton.Text = "⚙️"
+        settingsButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+        settingsButton.TextSize = 14
+        settingsButton.Font = Enum.Font.SourceSansBold
+    
+        -- Main Content Container (for the list)
+        local TeleportListContainer = Instance.new("ScrollingFrame")
+        TeleportListContainer.Name = "TeleportListContainer"
+        TeleportListContainer.Size = UDim2.new(1, 0, 1, -30)
+        TeleportListContainer.Position = UDim2.new(0, 0, 0, 30)
+        TeleportListContainer.BackgroundTransparency = 1
+        TeleportListContainer.Parent = TeleportTabContent
+        TeleportListContainer.CanvasSize = UDim2.new(0, 0, 0, 0) 
+        TeleportListContainer.ScrollBarThickness = 4
+        TeleportListContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+        TeleportListContainer.ElasticBehavior = Enum.ElasticBehavior.Never
+        TeleportListContainer.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+        TeleportListContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+        
+        -- The layout for the list container must be separate from the main tab content layout
+        local TeleportListLayoutInContainer = Instance.new("UIListLayout", TeleportListContainer)
+        TeleportListLayoutInContainer.Padding = UDim.new(0, 2)
+        TeleportListLayoutInContainer.SortOrder = Enum.SortOrder.LayoutOrder
+        setupCanvasSize(TeleportListLayoutInContainer, TeleportListContainer)
+        
+        -- Settings Frame
+        local TeleportSettingsFrame = Instance.new("ScrollingFrame", TeleportTabContent)
+        TeleportSettingsFrame.Name = "TeleportSettingsFrame"
+        TeleportSettingsFrame.Size = UDim2.new(1, 0, 1, -30)
+        TeleportSettingsFrame.Position = UDim2.new(0, 0, 0, 30)
+        TeleportSettingsFrame.BackgroundTransparency = 1
+        TeleportSettingsFrame.Visible = false
+        TeleportSettingsFrame.CanvasSize = UDim2.new(0, 0, 0, 0) 
+        TeleportSettingsFrame.ScrollBarThickness = 4
+        TeleportSettingsFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+        TeleportSettingsFrame.ElasticBehavior = Enum.ElasticBehavior.Never
+        TeleportSettingsFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+        TeleportSettingsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+
+        local TeleportSettingsListLayout = Instance.new("UIListLayout", TeleportSettingsFrame)
+        TeleportSettingsListLayout.Padding = UDim.new(0, 5)
+        setupCanvasSize(TeleportSettingsListLayout, TeleportSettingsFrame)
+    
+        -- Toggle Logic
+        settingsButton.MouseButton1Click:Connect(function()
+            local isSettingsVisible = not TeleportSettingsFrame.Visible
+            TeleportSettingsFrame.Visible = isSettingsVisible
+            TeleportListContainer.Visible = not isSettingsVisible
+            
+            if isSettingsVisible then
+                teleportTitleLabel.Text = "Pengaturan Teleport"
+                settingsButton.Text = "◀"
+            else
+                teleportTitleLabel.Text = "Lokasi Tersimpan"
+                settingsButton.Text = "⚙️"
+            end
+        end)
+
+        -- Populate Settings Frame
+        createSlider(TeleportSettingsFrame, "Sensitivitas Kamera", 1, 10, Settings.SpectateCameraSensitivity / 0.001, "", 0.1, function(v)
+            Settings.SpectateCameraSensitivity = v * 0.001
+        end)
+        createSlider(TeleportSettingsFrame, "Kecepatan Kamera", 1, 200, Settings.SpectateCameraSpeed, "", 1, function(v)
+            Settings.SpectateCameraSpeed = v
+        end)
+    
+        -- Move Existing UI Creation into the TeleportListContainer
         
         -- Wadah utama untuk semua kontrol toolbar
-        local mainToolbarContainer = Instance.new("Frame", TeleportTabContent)
+        local mainToolbarContainer = Instance.new("Frame", TeleportListContainer) -- Parent changed to new container
         mainToolbarContainer.Name = "TeleportToolbarContainer"
         mainToolbarContainer.Size = UDim2.new(1, 0, 0, 60) -- Cukup tinggi untuk dua baris
         mainToolbarContainer.BackgroundTransparency = 1
@@ -5758,8 +5848,6 @@ task.spawn(function()
         row2Layout.VerticalAlignment = Enum.VerticalAlignment.Center
         row2Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Pusatkan item di baris ini juga
         row2Layout.Padding = UDim.new(0, 5)
-
-        -- Membuat tombol dan input, lalu memasukkannya ke frame baris yang benar
 
         local importButton = createButton(row1Frame, "📥", function()
             showImportPrompt(function(text)
@@ -5840,12 +5928,12 @@ task.spawn(function()
         scanButton.Size = UDim2.new(0, 24, 0, 24)
         scanButton.TextSize = 14
 
-        createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
+        createToggle(TeleportListContainer, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
             areTeleportIconsVisible = v
             updateTeleportIconVisibility()
         end).LayoutOrder = 2
 
-        local autoLoopSettingsFrame = Instance.new("Frame", TeleportTabContent)
+        local autoLoopSettingsFrame = Instance.new("Frame", TeleportListContainer)
         autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 4
         local settingsLayout = Instance.new("UIListLayout", autoLoopSettingsFrame); settingsLayout.FillDirection, settingsLayout.VerticalAlignment, settingsLayout.Padding = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center, UDim.new(0, 5)
 
@@ -5862,7 +5950,7 @@ task.spawn(function()
         local playStopButton = createButton(autoLoopSettingsFrame, "▶️", function() end)
         playStopButton.Size, playStopButton.BackgroundColor3 = UDim2.new(0.2, 0, 0, 22), Color3.fromRGB(50, 180, 50)
 
-        createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 3
+        createToggle(TeleportListContainer, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 3
 
         playStopButton.MouseButton1Click:Connect(function()
             if not hasPermission("Normal") then
