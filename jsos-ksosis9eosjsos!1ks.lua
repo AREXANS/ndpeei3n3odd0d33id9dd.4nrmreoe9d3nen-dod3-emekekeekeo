@@ -4697,17 +4697,33 @@ task.spawn(function()
             camera.FieldOfView = originalCameraProperties.FieldOfView
         end)
         
-        -- Tampilkan kembali karakter pemain di posisi terakhirnya
+        -- Kembalikan properti visual karakter
         local localChar = LocalPlayer.Character
-        if localPlayerIsHidden and localChar then
-            if localChar.Parent ~= Workspace then
-                localChar.Parent = Workspace
+        if localChar and next(originalCharacterAppearance) then
+            local hrp = localChar:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local hrpProps = originalCharacterAppearance["HRP"]
+                if hrpProps then
+                    hrp.Anchored = hrpProps.Anchored
+                end
             end
-            if originalPlayerCFrame then
-                localChar:SetPrimaryPartCFrame(originalPlayerCFrame)
+            for part, props in pairs(originalCharacterAppearance) do
+                if typeof(part) == "Instance" and part.Parent then
+                    pcall(function()
+                        part.Transparency = props.Transparency
+                        part.CanCollide = props.CanCollide
+                    end)
+                end
             end
         end
-        localPlayerIsHidden = false
+        originalCharacterAppearance = {}
+
+        -- Kembalikan karakter ke posisi semula
+        if localChar and originalPlayerCFrame then
+             local hrp = localChar:FindFirstChild("HumanoidRootPart")
+             if hrp and hrp.Anchored then hrp.Anchored = false end
+             localChar:SetPrimaryPartCFrame(originalPlayerCFrame)
+        end
         originalPlayerCFrame = nil
     
         if spectateLocationGui then spectateLocationGui:Destroy(); spectateLocationGui = nil end
@@ -4732,13 +4748,30 @@ task.spawn(function()
             CFrame = camera.CFrame,
             FieldOfView = camera.FieldOfView
         }
-        
-        -- Simpan posisi karakter, pindahkan ke lokasi, lalu sembunyikan
-        -- INI ADALAH KUNCI UNTUK MEMBUAT MAP TER-RENDER
+
+        -- Simpan CFrame asli dan properti visual
         originalPlayerCFrame = localChar.PrimaryPart.CFrame
-        localChar:SetPrimaryPartCFrame(targetCFrame)
-        localPlayerIsHidden = true
-        localChar.Parent = nil
+        originalCharacterAppearance = {}
+        for _, part in ipairs(localChar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                originalCharacterAppearance[part] = {
+                    Transparency = part.Transparency,
+                    CanCollide = part.CanCollide
+                }
+                part.Transparency = 1
+                part.CanCollide = false
+            end
+        end
+        
+        -- Pindahkan karakter dan anchor
+        local hrp = localChar:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            originalCharacterAppearance["HRP"] = { Anchored = hrp.Anchored }
+            hrp.Anchored = true
+            hrp.CFrame = targetCFrame
+        else
+             localChar:SetPrimaryPartCFrame(targetCFrame)
+        end
         
         -- Atur kamera ke mode scriptable dan posisikan
         camera.CameraType = Enum.CameraType.Scriptable
@@ -4854,6 +4887,13 @@ task.spawn(function()
             -- Perbarui rotasi kamera dari input geser (swipe)
             local rotCFrame = CFrame.Angles(0, camYaw, 0) * CFrame.Angles(camPitch, 0, 0)
             camera.CFrame = CFrame.new(camPos) * rotCFrame
+            
+            -- Pindahkan karakter yang tidak terlihat ke posisi kamera untuk merender map
+            local localChar = LocalPlayer.Character
+            local hrp = localChar and localChar:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Anchored and isSpectatingLocation then
+                hrp.CFrame = camera.CFrame
+            end
         end)
 
         spectateCameraConnections = {swipeBeganConn, swipeChangedConn, swipeEndedConn, joystickChangedConn, joystickEndedConn, unifiedConn}
