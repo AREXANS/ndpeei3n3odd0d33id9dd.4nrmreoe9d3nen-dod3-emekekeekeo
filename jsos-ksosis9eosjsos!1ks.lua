@@ -6860,8 +6860,8 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             -- Setup Movers for Physics-based movement
             pcall(function()
                 local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
-                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = 200; alignPos.MaxForce = 9e9
-                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 9e9
+                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = 35; alignPos.MaxForce = 9e9
+                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 35; alignOrient.MaxTorque = 9e9
                 playbackMovers.attachment = attachment
                 playbackMovers.alignPos = alignPos
                 playbackMovers.alignOrient = alignOrient
@@ -6959,78 +6959,94 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 -- Animation handling
                 local LERP_FACTOR = 0.1 -- Faktor interpolasi untuk penghalusan
                 humanoid.WalkSpeed = humanoid.WalkSpeed + (velocity - humanoid.WalkSpeed) * LERP_FACTOR -- [DIHALUSKAN] Sesuaikan kecepatan langkah secara bertahap
-                
-                local movementAnims = {Walk = nil, Run = nil}
-                local otherAnims = {}
 
-                -- Pisahkan animasi gerak (jalan/lari) dari animasi lainnya
-                for _, animData in ipairs(frame1.anims) do
-                    if animData.name and animData.name:lower():find("walk") then
-                        movementAnims.Walk = animData
-                    elseif animData.name and animData.name:lower():find("run") then
-                        movementAnims.Run = animData
-                    else
-                        table.insert(otherAnims, animData)
+                if isAnimationBypassEnabled then
+                    if animateScript and animateScript.Disabled then
+                        animateScript.Disabled = false
+                    end
+                    -- Hentikan semua animasi kustom yang mungkin masih berjalan dari mode non-bypass
+                    for id, track in pairs(animationCache) do
+                        if track.IsPlaying then track:Stop(0) end
+                    end
+                else
+                    if animateScript and not animateScript.Disabled then
+                        animateScript.Disabled = true
+                    end
+                    
+                    local movementAnims = {Walk = nil, Run = nil}
+                    local otherAnims = {}
+
+                    -- Pisahkan animasi gerak (jalan/lari) dari animasi lainnya
+                    for _, animData in ipairs(frame1.anims) do
+                        if animData.name and animData.name:lower():find("walk") then
+                            movementAnims.Walk = animData
+                        elseif animData.name and animData.name:lower():find("run") then
+                            movementAnims.Run = animData
+                        else
+                            table.insert(otherAnims, animData)
+                        end
+                    end
+
+                    local selectedMovementAnim = nil
+                    local RUN_UPPER_THRESHOLD = 22 -- Ambang batas untuk mulai berlari
+                    local RUN_LOWER_THRESHOLD = 18 -- Ambang batas untuk berhenti berlari
+
+                    -- Logika Histeresis untuk peralihan animasi
+                    if currentMovementState == "walk" and velocity > RUN_UPPER_THRESHOLD and movementAnims.Run then
+                        currentMovementState = "run"
+                    elseif currentMovementState == "run" and velocity < RUN_LOWER_THRESHOLD then
+                        currentMovementState = "walk"
+                    end
+
+                    -- Pilih animasi berdasarkan status saat ini
+                    if currentMovementState == "run" and movementAnims.Run then
+                        selectedMovementAnim = movementAnims.Run
+                    elseif velocity > 1 and (movementAnims.Walk or movementAnims.Run) then
+                        selectedMovementAnim = movementAnims.Walk or movementAnims.Run -- Fallback jika animasi lari tidak ada
+                    end
+
+                    local requiredAnims = {}
+
+                    -- Putar animasi gerak yang dipilih
+                    if selectedMovementAnim then
+                        requiredAnims[selectedMovementAnim.id] = true
+                        if not animationCache[selectedMovementAnim.id] then
+                            local anim = Instance.new("Animation"); anim.AnimationId = selectedMovementAnim.id
+                            animationCache[selectedMovementAnim.id] = humanoid:LoadAnimation(anim)
+                        end
+                        local track = animationCache[selectedMovementAnim.id]
+                        if not track.IsPlaying then track:Play(0.1) end
+                        track:AdjustSpeed(1) -- Biarkan kecepatan animasi natural, WalkSpeed yang mengatur kecepatan kaki
+                    end
+
+                    -- Putar animasi lainnya
+                    for _, animData in ipairs(otherAnims) do
+                        requiredAnims[animData.id] = true
+                        if not animationCache[animData.id] then
+                            local anim = Instance.new("Animation"); anim.AnimationId = animData.id
+                            animationCache[animData.id] = humanoid:LoadAnimation(anim)
+                        end
+                        local track = animationCache[animData.id]
+                        if not track.IsPlaying then track:Play(0.1) end
+                        track:AdjustSpeed(1) -- Asumsikan kecepatan normal untuk animasi lain
+                    end
+
+                    -- Hentikan animasi yang tidak lagi diperlukan
+                    for id, track in pairs(animationCache) do
+                        if not requiredAnims[id] and track.IsPlaying then
+                            track:Stop(0.1)
+                        end
                     end
                 end
 
-                local selectedMovementAnim = nil
-                local RUN_UPPER_THRESHOLD = 22 -- Ambang batas untuk mulai berlari
-                local RUN_LOWER_THRESHOLD = 18 -- Ambang batas untuk berhenti berlari
-
-                -- Logika Histeresis untuk peralihan animasi
-                if currentMovementState == "walk" and velocity > RUN_UPPER_THRESHOLD and movementAnims.Run then
-                    currentMovementState = "run"
-                elseif currentMovementState == "run" and velocity < RUN_LOWER_THRESHOLD then
-                    currentMovementState = "walk"
-                end
-
-                -- Pilih animasi berdasarkan status saat ini
-                if currentMovementState == "run" and movementAnims.Run then
-                    selectedMovementAnim = movementAnims.Run
-                elseif velocity > 1 and (movementAnims.Walk or movementAnims.Run) then
-                    selectedMovementAnim = movementAnims.Walk or movementAnims.Run -- Fallback jika animasi lari tidak ada
-                end
-
-                local requiredAnims = {}
-
-                -- Putar animasi gerak yang dipilih
-                if selectedMovementAnim then
-                    requiredAnims[selectedMovementAnim.id] = true
-                    if not animationCache[selectedMovementAnim.id] then
-                        local anim = Instance.new("Animation"); anim.AnimationId = selectedMovementAnim.id
-                        animationCache[selectedMovementAnim.id] = humanoid:LoadAnimation(anim)
-                    end
-                    local track = animationCache[selectedMovementAnim.id]
-                    if not track.IsPlaying then track:Play(0.1) end
-                    track:AdjustSpeed(1) -- Biarkan kecepatan animasi natural, WalkSpeed yang mengatur kecepatan kaki
-                end
-
-                -- Putar animasi lainnya
-                for _, animData in ipairs(otherAnims) do
-                    requiredAnims[animData.id] = true
-                    if not animationCache[animData.id] then
-                        local anim = Instance.new("Animation"); anim.AnimationId = animData.id
-                        animationCache[animData.id] = humanoid:LoadAnimation(anim)
-                    end
-                    local track = animationCache[animData.id]
-                    if not track.IsPlaying then track:Play(0.1) end
-                    track:AdjustSpeed(1) -- Asumsikan kecepatan normal untuk animasi lain
-                end
-
-                -- Hentikan animasi yang tidak lagi diperlukan
-                for id, track in pairs(animationCache) do
-                    if not requiredAnims[id] and track.IsPlaying then
-                        track:Stop(0.1)
-                    end
-                end
-
-                -- Humanoid state (less critical with physics movers, but good for sounds/effects)
+                -- Humanoid state (PENTING untuk bypass animasi)
                 pcall(function()
                     local currentState = frame1.state
-                    if currentState and humanoid:GetState() ~= currentState then
+                    if currentState then
                        local stateEnum = Enum.HumanoidStateType[currentState:match("Enum.HumanoidStateType%.(.*)")]
-                       if stateEnum then humanoid:ChangeState(stateEnum) end
+                       if stateEnum and humanoid:GetState() ~= stateEnum then
+                           humanoid:ChangeState(stateEnum)
+                       end
                     end
                 end)
             end)
@@ -7075,16 +7091,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             end
         end)
         bypassAnimToggle.LayoutOrder = 3
-
-        local locationPlaybackToggle, locationPlaybackSwitch = createToggle(controlsContainer, "Putar Berdasarkan Lokasi", isLocationPlaybackEnabled, function(v)
-            isLocationPlaybackEnabled = v
-            if v then
-                showNotification("Pemutaran Berdasarkan Lokasi Diaktifkan.", Color3.fromRGB(50, 200, 50))
-            else
-                showNotification("Pemutaran Berdasarkan Lokasi Dinonaktifkan.", Color3.fromRGB(200, 150, 50))
-            end
-        end)
-        locationPlaybackToggle.LayoutOrder = 4
 
         recStatusLabel = Instance.new("TextLabel", controlsContainer) -- [[ PERBAIKAN: Parent diubah ]]
         recStatusLabel.Name = "StatusLabel"
@@ -7447,30 +7453,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             lastPlayerPosition = hrp.Position
         end
     end)
-
-    local function locationPlaybackLoop()
-        while true do
-            task.wait(1) -- Check every second
-            if isLocationPlaybackEnabled and not isPlaying and not isRecording then
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    for name, recording in pairs(savedRecordings) do
-                        if recording.startCFrame then
-                            local startPos = CFrame.new(unpack(recording.startCFrame)).Position
-                            if (hrp.Position - startPos).Magnitude < 15 then
-                                if name ~= lastManuallyStoppedRecording then
-                                    playSingleRecording(recording)
-                                    break 
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    task.spawn(locationPlaybackLoop)
 
     -- Countdown Timer
     local countdownConn
