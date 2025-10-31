@@ -728,6 +728,9 @@ task.spawn(function()
         currentRecordingData = {}
         loadedRecordingName = nil
         currentRecordingTarget = nil -- [[ PERUBAHAN BARU ]]
+        isLocationPlaybackEnabled = false
+        lastManuallyStoppedRecording = nil
+        locationPlaybackCooldown = 5 -- seconds
 
         -- [[ VARIABEL UNTUK FITUR COPY MOVEMENT ]] --
         isCopyingMovement = false
@@ -6066,8 +6069,18 @@ task.spawn(function()
             end
         end
 
-        stopPlayback = function(isSequence) -- [[ PERBAIKAN: Terima argumen isSequence ]]
+        stopPlayback = function(isSequence, isManual) 
             if not isPlaying and not isPaused then return end
+            
+            if isManual and loadedRecordingName then
+                lastManuallyStoppedRecording = loadedRecordingName
+                task.delay(locationPlaybackCooldown, function()
+                    if lastManuallyStoppedRecording == loadedRecordingName then
+                        lastManuallyStoppedRecording = nil
+                    end
+                end)
+            end
+
             isPlaying = false
             isPaused = false -- Ensure pause state is also reset
             if playbackConnection then
@@ -6125,7 +6138,7 @@ task.spawn(function()
 
             local sortedNames = {}
             for name in pairs(savedRecordings) do table.insert(sortedNames, name) end
-            table.sort(sortedNames)
+            table.sort(sortedNames, naturalCompare)
 
             local sequenceToPlay = {}
             for _, recName in ipairs(sortedNames) do
@@ -6325,7 +6338,7 @@ task.spawn(function()
             CloseButton.Text = "X"; CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255); CloseButton.TextSize = 16
             CloseButton.MouseButton1Click:Connect(function()
                 if isPreviewing then 
-                    stopPlayback() 
+                    stopPlayback(false, true) 
                     isPlaying = originalIsPlaying
                 end
                 ScreenGui:Destroy()
@@ -6492,7 +6505,7 @@ task.spawn(function()
             end)
 
             local saveButton = createButton(bottomControls, "💾", function()
-                if isPreviewing then stopPlayback() end
+                if isPreviewing then stopPlayback(false, true) end
                 
                 local baseName = nameTextBox.Text
                 if not baseName or baseName == "" then
@@ -6791,7 +6804,8 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 
                 local recordingObject = {
                     frames = currentRecordingData,
-                    targetUserId = currentRecordingTarget.UserId
+                    targetUserId = currentRecordingTarget.UserId,
+                    startCFrame = currentRecordingData[1].cframe
                 }
                 savedRecordings[newName] = recordingObject
                 
@@ -6816,12 +6830,26 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local humanoid = char and char:FindFirstChildOfClass("Humanoid")
             if not (hrp and humanoid) then if onComplete then onComplete() end; return end
         
-            humanoid.AutoRotate = false -- [[ FIX: Pastikan kontrol fisika mengambil alih sepenuhnya ]]
+            local recordingData = recordingObject.frames or recordingObject
+            if not recordingData or #recordingData < 2 then 
+                if onComplete then onComplete() end
+                return 
+            end
+
+            -- [[ FIX: Teleportasi yang Ditingkatkan ]]
+            -- 1. Nonaktifkan PlatformStand untuk memastikan karakter tidak "terpaku" di udara.
+            humanoid.PlatformStand = false
+            -- 2. Teleport karakter ke CFrame awal rekaman.
+            local startCFrame = CFrame.new(unpack(recordingData[1].cframe))
+            hrp.CFrame = startCFrame
+            -- 3. Beri jeda singkat agar karakter stabil di posisi baru sebelum fisika mengambil alih.
+            task.wait(0.1) 
+            -- 4. Aktifkan PlatformStand untuk mencegah kontroler default mengganggu.
+            humanoid.PlatformStand = true
+
+            humanoid.AutoRotate = false
             originalPlaybackWalkSpeed = humanoid.WalkSpeed
             local animateScript = char and char:FindFirstChild("Animate")
-        
-            local recordingData = recordingObject.frames or recordingObject
-            if not recordingData or #recordingData < 1 then if onComplete then onComplete() end; return end
         
             local recordingDuration = recordingData[#recordingData].time
             if recordingDuration <= 0 then if onComplete then onComplete() end; return end
@@ -6832,8 +6860,8 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             -- Setup Movers for Physics-based movement
             pcall(function()
                 local attachment = Instance.new("Attachment", hrp); attachment.Name = "ReplayAttachment"
-                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = 35; alignPos.MaxForce = 9e9
-                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 35; alignOrient.MaxTorque = 9e9
+                local alignPos = Instance.new("AlignPosition", attachment); alignPos.Attachment0 = attachment; alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment; alignPos.Responsiveness = 200; alignPos.MaxForce = 9e9
+                local alignOrient = Instance.new("AlignOrientation", attachment); alignOrient.Attachment0 = attachment; alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment; alignOrient.Responsiveness = 200; alignOrient.MaxTorque = 9e9
                 playbackMovers.attachment = attachment
                 playbackMovers.alignPos = alignPos
                 playbackMovers.alignOrient = alignOrient
@@ -7048,6 +7076,16 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         end)
         bypassAnimToggle.LayoutOrder = 3
 
+        local locationPlaybackToggle, locationPlaybackSwitch = createToggle(controlsContainer, "Putar Berdasarkan Lokasi", isLocationPlaybackEnabled, function(v)
+            isLocationPlaybackEnabled = v
+            if v then
+                showNotification("Pemutaran Berdasarkan Lokasi Diaktifkan.", Color3.fromRGB(50, 200, 50))
+            else
+                showNotification("Pemutaran Berdasarkan Lokasi Dinonaktifkan.", Color3.fromRGB(200, 150, 50))
+            end
+        end)
+        locationPlaybackToggle.LayoutOrder = 4
+
         recStatusLabel = Instance.new("TextLabel", controlsContainer) -- [[ PERBAIKAN: Parent diubah ]]
         recStatusLabel.Name = "StatusLabel"
         recStatusLabel.Size = UDim2.new(1, 0, 0, 20)
@@ -7091,7 +7129,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
         end)
 
         stopButton.MouseButton1Click:Connect(function()
-            stopActions()
+            stopPlayback(false, true)
         end)
 
         deleteSelectedButton.MouseButton1Click:Connect(function()
@@ -7241,11 +7279,11 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
                 
                 -- Jika pemutaran juga berjalan, hentikan setelah rekaman disimpan
                 if isPlaying then
-                    stopPlayback()
+                    stopPlayback(false, true)
                 end
             -- Jika hanya pemutaran yang berjalan (tidak ada rekaman)
             elseif isPlaying then
-                stopPlayback()
+                stopPlayback(false, true)
             -- Jika tidak ada yang aktif, mulai rekaman baru
             else
                 if IsViewingPlayer and currentlyViewedPlayer then
@@ -7394,6 +7432,45 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     if LocalPlayer.Character then
         reapplyFeaturesOnRespawn(LocalPlayer.Character)
     end
+
+    local lastPlayerPosition = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+    RunService.Heartbeat:Connect(function()
+        if not isPlaying then return end
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if lastPlayerPosition then
+                if (hrp.Position - lastPlayerPosition).Magnitude > 100 then
+                    stopPlayback(false, true)
+                end
+            end
+            lastPlayerPosition = hrp.Position
+        end
+    end)
+
+    local function locationPlaybackLoop()
+        while true do
+            task.wait(1) -- Check every second
+            if isLocationPlaybackEnabled and not isPlaying and not isRecording then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    for name, recording in pairs(savedRecordings) do
+                        if recording.startCFrame then
+                            local startPos = CFrame.new(unpack(recording.startCFrame)).Position
+                            if (hrp.Position - startPos).Magnitude < 15 then
+                                if name ~= lastManuallyStoppedRecording then
+                                    playSingleRecording(recording)
+                                    break 
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    task.spawn(locationPlaybackLoop)
 
     -- Countdown Timer
     local countdownConn
