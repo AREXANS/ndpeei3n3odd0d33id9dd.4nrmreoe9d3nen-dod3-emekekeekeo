@@ -6586,7 +6586,7 @@ task.spawn(function()
             local recordingsToJoin = {}
             local sortedNames = {}
             for name in pairs(savedRecordings) do table.insert(sortedNames, name) end
-            table.sort(sortedNames)
+            table.sort(sortedNames, naturalCompare)
 
             for _, name in ipairs(sortedNames) do
                 if selectedRecordings[name] then
