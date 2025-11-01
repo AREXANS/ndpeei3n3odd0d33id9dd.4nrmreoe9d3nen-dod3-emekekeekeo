@@ -1,13 +1,4 @@
---[[
-    Script: Halaman Info & Update untuk Arexanstools (Versi Revisi Tema Biru)
-    Deskripsi: Menampilkan jendela pop-up dengan pemberitahuan update dan daftar fitur.
-    Perubahan (Tema Biru):
-    - Seluruh UI diubah menjadi tema biru yang transparan dan modern.
-    - Semua warna teks diubah menjadi variasi biru agar serasi.
-    - Ukuran jendela diperkecil dan jarak antar elemen dirapatkan agar lebih rapi dan ringkas.
-]]
 
--- Mencegah GUI dibuat berulang kali jika skrip dieksekusi lebih dari sekali.
 if game:GetService("CoreGui"):FindFirstChild("ArexanstoolsInfoGUI") then
     game:GetService("CoreGui"):FindFirstChild("ArexanstoolsInfoGUI"):Destroy()
 end
@@ -20,12 +11,15 @@ local UserInputService = game:GetService("UserInputService")
 -- == DATA UPDATE BARU                                             ==
 -- ====================================================================
 local UPDATE_INFO = {
-    Title = "✨ Update Arexans Tools V5.4 ✨",
+    Title = "✨ Update Arexans Tools V5.7 ✨",
     Changes = {
-        "- Tab Game",
-        "- Fitur terbaru Game Perang",
-        "- Ganti slider menjadi textbox",
-        "- Fix error Kunci Kecepatan"
+        "- Penjelasan semua fitur baru ditambahkan.",
+        "- Menambahkan fitur Tab Game.",
+        "- Menambahkan fitur Kunci Kecepatan.",
+        "- Menambahkan fitur Pangkas (Trim) & Gabung (Join) Rekaman.",
+        "- Menambahkan pengaturan kustom (warna ESP, jeda copy, dll).",
+        "- Peningkatan besar pada Spectate Lokasi (kini Free-cam).",
+        "- Perbaikan bug dan peningkatan stabilitas."
     }
 }
 
@@ -38,18 +32,20 @@ local FEATURES = {
         Items = {
             "**Daftar Pemain & Pencarian**: Fungsi: Menampilkan daftar semua pemain yang sedang online di server. Terdapat bar pencarian untuk menemukan pemain spesifik dengan cepat berdasarkan nama atau display name mereka. Detail: Di samping nama setiap pemain, terdapat informasi jarak (dalam meter) dari Anda ke pemain tersebut.",
             "**Refresh List (Ikon 🔄)**: Fungsi: Mengklik ikon panah berputar ini akan memperbarui daftar pemain secara manual. Berguna jika ada pemain baru masuk atau keluar server.",
-            "**Spectate / Mata-matai (Ikon Avatar Pemain)**: Fungsi: Dengan mengklik gambar avatar seorang pemain, Anda akan masuk ke mode penonton (spectator). Kamera Anda akan mengikuti pergerakan pemain tersebut, seolah-olah Anda melihat dari sudut pandang mereka. Selama mode ini, karakter Anda akan disembunyikan dan dipindahkan ke lokasi yang aman. Kontrol Spectate: Saat memata-matai, akan muncul bar di bagian bawah layar dengan nama pemain yang sedang diamati. Anda bisa menekan tombol < atau > untuk beralih memata-matai pemain lain, atau klik nama pemain tersebut untuk berhenti.",
+            "**Spectate / Mata-matai (Ikon Avatar Pemain)**: Fungsi: Dengan mengklik gambar avatar seorang pemain, Anda akan masuk ke mode penonton (spectator). Kamera Anda akan mengikuti pergerakan pemain tersebut. Selama mode ini, karakter Anda akan disembunyikan dan dipindahkan ke lokasi yang aman. Kontrol Spectate: Saat memata-matai, akan muncul bar di bagian bawah layar dengan nama pemain yang sedang diamati. Anda bisa menekan tombol < atau > untuk beralih memata-matai pemain lain, atau klik nama pemain tersebut untuk berhenti. **Baru:** Anda juga bisa menekan tombol \"Rekam\" langsung dari bar spectate untuk merekam pemain tersebut.",
             "**Teleport (Ikon 🌀)**: Fungsi: Mengklik ikon teleport ini akan langsung memindahkan karakter Anda ke posisi pemain yang dipilih.",
             "**Fling (Ikon ☠️)**: Fungsi: Mengaktifkan mode \"fling\" pada pemain target. Karakter Anda akan menabrak target berulang kali dengan kecepatan sangat tinggi, membuat mereka terpental tak terkendali. Fitur ini akan terus aktif sampai Anda mengklik kembali ikon tengkorak tersebut atau menekan bar status \"Hentikan Fling\" yang muncul di atas layar.",
-            "**Copy Movement (Ikon 👯)**: Fungsi: Meniru semua gerakan dan animasi pemain yang dipilih secara real-time. Karakter Anda akan berlari, melompat, dan menggunakan animasi yang sama persis dengan target. Fitur ini aktif/nonaktif dengan mengklik ikon orang kembar."
+            "**Copy Movement (Ikon 👯)**: Fungsi: Meniru semua gerakan dan animasi pemain yang dipilih secara real-time. Karakter Anda akan berlari, melompat, dan menggunakan animasi yang sama persis dengan target. Fitur ini aktif/nonaktif dengan mengklik ikon orang kembar.",
+            "**Pengaturan Player (Ikon ⚙️)**: **[BARU]** Membuka menu pengaturan khusus untuk fitur di tab Player. Anda bisa: Menyembunyikan/menampilkan ikon (Copy, Fling, Teleport) dari daftar pemain. Mengatur \"Jeda Waktu\" untuk Copy Movement (semakin kecil jeda, semakin akurat). Mengaktifkan \"Bypass Animasi\" untuk Copy Movement. Mengaktifkan \"Invisible Fling\"."
         }
     },
     {
         Tab = "⚙️ Umum (General)",
         Items = {
-            "**ESP Nama & ESP Tubuh (Wallhack)**: Fungsi: Extra Sensory Perception memungkinkan Anda melihat pemain lain menembus objek seperti dinding. ESP Nama: Menampilkan nama dan jarak pemain di atas kepala mereka. ESP Tubuh: Memberikan sorotan (highlight) berwarna pada seluruh tubuh karakter pemain. Detail: Pemain satu tim akan berwarna hijau, sedangkan pemain lain (musuh/netral) akan berwarna biru.",
-            "**WalkSpeed / Kecepatan Jalan**: Fungsi: Mengatur kecepatan berjalan karakter Anda menggunakan slider. Anda harus mengaktifkan toggle \"Jalan Cepat\" agar kecepatan yang diatur pada slider diterapkan.",
-            "**Fly / Terbang**: Fungsi: Mengaktifkan mode terbang. Kontrol (PC): Gunakan tombol W, A, S, D untuk bergerak maju/kiri/mundur/kanan, E untuk naik, dan Q untuk turun. Kecepatan terbang bisa diatur melalui slider. Kontrol (Mobile): Gunakan joystick di layar untuk bergerak.",
+            "**ESP (Wallhack) & Pengaturan (Ikon ⚙️)**: Fungsi: ESP memungkinkan Anda melihat pemain lain menembus objek. ESP Nama: Menampilkan nama dan jarak. ESP Health Bar: Menampilkan bar darah. ESP Tubuh: Memberikan sorotan (highlight). ESP Garis: Menarik garis dari layar Anda ke pemain. **Baru:** Klik ikon ⚙️ untuk membuka pengaturan warna. Anda bisa mengubah warna ESP untuk Tim dan Musuh menggunakan color picker HSV.",
+            "**WalkSpeed / Kecepatan Jalan**: Fungsi: Mengatur kecepatan berjalan karakter Anda menggunakan textbox. Anda harus mengaktifkan toggle \"Jalan Cepat\" agar kecepatan yang diatur diterapkan.",
+            "**Kunci Kecepatan (Speed Lock)**: **[BARU]** Fungsi: Mengunci kecepatan berjalan Anda pada nilai yang ditentukan di textbox \"Kecepatan Terkunci\". Fitur ini secara aktif melawan perubahan kecepatan yang dilakukan oleh server (misalnya, saat terkena debuff pelan atau mendapat buff cepat), menjaga kecepatan Anda tetap konstan.",
+            "**Fly / Terbang**: Fungsi: Mengaktifkan mode terbang. Kontrol (PC): Gunakan tombol W, A, S, D untuk bergerak maju/kiri/mundur/kanan, E untuk naik, dan Q untuk turun. Kecepatan terbang bisa diatur melalui textbox. Kontrol (Mobile): Gunakan joystick di layar untuk bergerak.",
             "**Noclip**: Fungsi: Memungkinkan karakter Anda menembus semua objek solid seperti dinding, lantai, dan bangunan.",
             "**Infinity Jump**: Fungsi: Anda bisa melompat berkali-kali di udara tanpa perlu menyentuh tanah.",
             "**God Mode (Mode Kebal)**: Fungsi: Karakter Anda tidak akan bisa mati. Jika darah Anda mencapai 0, akan langsung terisi kembali penuh.",
@@ -67,20 +63,30 @@ local FEATURES = {
             "**Simpan Lokasi Saat Ini**: Menyimpan posisi Anda saat ini sebagai titik teleport baru dengan nama \"Kustom [nomor]\".",
             "**Impor/Ekspor**: Ekspor: Menyalin semua data lokasi teleport Anda ke clipboard untuk dibagikan. Impor: Membuka jendela untuk menempelkan (paste) data lokasi dari orang lain.",
             "**Auto Loop Teleport**: Membuka menu kecil untuk teleportasi otomatis. Anda bisa mengatur jumlah pengulangan (0 untuk tak terbatas) dan jeda waktu antar teleportasi. Script akan teleportasi ke semua lokasi yang tersimpan secara berurutan.",
-            "**Ikon pada Daftar Lokasi**: 👁️ (Spectate): Melihat pratinjau lokasi sebelum berteleportasi. Anda bisa terbang bebas di sekitar lokasi untuk memeriksanya. R (Rename): Mengganti nama lokasi yang tersimpan. X (Delete): Menghapus lokasi dari daftar."
+            "**Ikon pada Daftar Lokasi**: **[DIPERBARUI]** 👁️ (Spectate Free-cam): Memindahkan Anda ke mode kamera bebas (free-cam) di lokasi yang dipilih. Anda bisa terbang bebas menggunakan joystick di layar (mobile) atau mouse (PC) untuk memeriksa area tersebut. R (Rename): Mengganti nama lokasi yang tersimpan. X (Delete): Menghapus lokasi dari daftar.",
+            "**Pengaturan Teleport (Ikon ⚙️)**: **[BARU]** Membuka menu pengaturan untuk fitur spectate lokasi. Anda bisa mengatur \"Sensitivitas Kamera\" dan \"Kecepatan Kamera\" untuk mode free-cam."
         }
     },
     {
         Tab = "🎥 Rekaman (Recording)",
         Items = {
             "**Rekam Gerakan (Ikon 🔴 / ⏹️)**: Fungsi: Mulai merekam pergerakan Anda sendiri atau pemain lain (jika sedang spectate). Tombol akan berubah menjadi kotak (⏹️) selama merekam. Klik lagi untuk berhenti dan menyimpan rekaman.",
-            "**Impor (Ikon 📥) & Ekspor (Ikon 📤)**: Fungsi: Memungkinkan Anda menyimpan rekaman yang dipilih ke dalam sebuah file di folder ArexansTools/Rekaman, atau mengimpor file rekaman dari folder tersebut. Sangat berguna untuk berbagi gerakan kompleks dengan orang lain.",
+            "**Impor (Ikon 📥) & Ekspor (Ikon 📤)**: **[DIPERBARUI]** Impor: Membuka jendela file picker untuk memilih file `.json` dari folder `ArexansTools/Rekaman` Anda untuk diimpor ke dalam daftar. Ekspor: Menyimpan semua rekaman yang *sedang dipilih* ke dalam satu file `.json` baru di folder `ArexansTools/Rekaman`.",
+            "**Pangkas (Ikon ✂️)**: **[BARU]** Membuka jendela editor untuk memangkas (trim) rekaman. Anda harus memilih *satu* rekaman dari daftar. Anda bisa menggeser slider awal dan akhir, melihat pratinjau, dan menyimpannya sebagai file rekaman baru.",
+            "**Gabung (Ikon 🔗)**: **[BARU]** Menggabungkan semua rekaman yang *sedang dipilih* (minimal 2) menjadi satu rekaman panjang. Rekaman akan digabung berdasarkan urutan tampilannya di daftar.",
             "**Putar Rekaman (Ikon ▶️ / ⏸️)**: Fungsi: Memutar rekaman yang telah dipilih dari daftar. Jika ada lebih dari satu rekaman yang dipilih, semua akan diputar secara berurutan (sekuens). Saat pemutaran berlangsung, tombol berubah menjadi jeda (⏸️).",
             "**Hentikan Rekaman (Ikon ⏹️)**: Fungsi: Menghentikan semua proses pemutaran rekaman.",
             "**Pilih Semua (Ikon ☑️)**: Fungsi: Memilih atau membatalkan pilihan semua rekaman di daftar.",
             "**Hapus Pilihan (Ikon 🗑️)**: Fungsi: Menghapus semua rekaman yang sedang dipilih secara permanen.",
             "**Jumlah Ulang (Looping)**: Anda bisa menentukan berapa kali sekuens rekaman akan diulang. Isi dengan 0 untuk pengulangan tanpa batas (infinity).",
             "**Bypass Animasi**: Jika diaktifkan, saat memutar rekaman, karakter Anda akan menggunakan set animasi (berjalan, berlari, lompat) yang sudah Anda atur di tab VIP, bukan animasi asli dari rekaman."
+        }
+    },
+    {
+        Tab = "🎮 Game",
+        Items = {
+            "**Game Perang**: **[BARU]** Memuat skrip game mini \"Game Perang\" di dalam game yang sedang Anda mainkan.",
+            "**Fish It**: **[BARU]** Memuat skrip game mini \"Fish It\"."
         }
     },
     {
@@ -97,6 +103,7 @@ local FEATURES = {
             "**Kunci Posisi UI**: Mengunci posisi bar tombol di sisi kanan layar agar tidak bisa digeser-geser.",
             "**Simpan Posisi UI**: Menyimpan posisi semua jendela (menu utama, emote, animasi, dll) sehingga saat Anda membuka script lagi, posisinya akan sama seperti terakhir kali Anda atur.",
             "**Hop Server**: Pindah ke server publik lain secara acak di game yang sama.",
+            "**Rejoin**: **[BARU]** Bergabung kembali dengan server yang sama tempat Anda berada saat ini.",
             "**Anti-Lag**: Menonaktifkan partikel, bayangan, dan efek-efek visual lain yang tidak penting untuk meningkatkan performa.",
             "**Boost FPS**: Opsi optimisasi yang lebih agresif dari Anti-Lag, menyederhanakan lebih banyak elemen visual untuk mendapatkan FPS semaksimal mungkin.",
             "**Optimized Game**: Mode optimisasi paling ekstrem. Menyembunyikan objek-objek dekoratif seperti pohon dan rumput, serta menonaktifkan efek-efek berat lainnya.",
@@ -311,10 +318,18 @@ for i, category in ipairs(FEATURES) do
         FeatureLabel.BackgroundTransparency = 1
         FeatureLabel.Font = Enum.Font.SourceSans
         
-        local formattedText = item:gsub("%*%*(.-)%*%*", "<b>%1</b>")
-        FeatureLabel.Text = "  •  " .. formattedText
+        -- ===================== [PERBAIKAN DI SINI] =====================
+        -- Pertama, escape karakter < dan > yang ada di teks asli
+        -- Ganti "<" menjadi "&lt;" dan ">" menjadi "&gt;"
+        local escapedItem = item:gsub("<", "&lt;"):gsub(">", "&gt;")
         
+        -- Kedua, baru terapkan formatting bold ke teks yang sudah di-escape
+        local formattedText = escapedItem:gsub("%*%*(.-)%*%*", "<b>%1</b>")
+        
+        FeatureLabel.Text = "  •  " .. formattedText
         FeatureLabel.RichText = true
+        -- =================== [AKHIR DARI PERBAIKAN] ====================
+        
         FeatureLabel.TextColor3 = Color3.fromRGB(180, 210, 255) -- Teks biru
         FeatureLabel.TextSize = 12
         FeatureLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -336,3 +351,4 @@ local tweenIn = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingSty
     Position = UDim2.new(0.5, -mainFrameSize.X/2, 0.5, -mainFrameSize.Y/2)
 })
 tweenIn:Play()
+
